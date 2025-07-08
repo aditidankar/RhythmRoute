@@ -1,17 +1,46 @@
-train/
-test/
-edge_aistpp/
-dataset_backups/
+# Created by .ignore support
+# Folders to ignore
+# =================================
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+
+# Experiment outputs and logs
 runs/
 wandb/
+
+# Generated media files
 renders/
-.ipynb_checkpoints/
-__pycache__/
+edge_aistpp/
+
+# Data and data-related folders
+# This single line ignores the entire /data directory and its contents
+data/train/
+data/test/
+data/dataset_backups/
+
+# Other data/cache folders
+train/
+test/
+dataset_backups/
+cached_features/
+custom_music/
+custom_music_one_song/
+
+# Specific file types to ignore
+# =================================
+
+# Media files
 *.gif
 *.mp4
+
+# Data, models, and archives
 *.pkl
 *.pt
 *.npy
 *.zip
-cached_features/
-custom_music/
+*.tar.gz
+*.tar
