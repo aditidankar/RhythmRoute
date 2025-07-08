@@ -1,7 +1,13 @@
 import torch
-from pytorch3d.transforms import (axis_angle_to_matrix, matrix_to_axis_angle,
-                                  matrix_to_quaternion, matrix_to_rotation_6d,
-                                  quaternion_to_matrix, rotation_6d_to_matrix)
+from pytorch3d.transforms import (axis_angle_to_matrix, 
+                                #   matrix_to_axis_angle,
+                                  matrix_to_quaternion, 
+                                  matrix_to_rotation_6d,
+                                  quaternion_to_matrix, 
+                                  rotation_6d_to_matrix
+                                  )
+
+from pytorch3d.transforms.rotation_conversions import matrix_to_axis_angle
 
 
 def quat_to_6v(q):

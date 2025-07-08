@@ -196,7 +196,7 @@ class EDGE:
             avg_footloss = 0
             # train
             self.train()
-            for step, (x, cond, filename, wavnames) in enumerate(
+            for step, (x, cond, root_traj, filename, wavnames) in enumerate(        # Added root_traj: ADITI
                 load_loop(train_data_loader)
             ):
                 total_loss, (loss, v_loss, fk_loss, foot_loss) = self.diffusion(
@@ -250,7 +250,7 @@ class EDGE:
                     shape = (render_count, self.horizon, self.repr_dim)
                     print("Generating Sample")
                     # draw a music from the test dataset
-                    (x, cond, filename, wavnames) = next(iter(test_data_loader))
+                    (x, cond, root_traj, filename, wavnames) = next(iter(test_data_loader))     # Added root_traj: ADITI
                     cond = cond.to(self.accelerator.device)
                     self.diffusion.render_sample(
                         shape,

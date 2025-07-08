@@ -125,4 +125,21 @@ def test(opt):
 
 if __name__ == "__main__":
     opt = parse_test_opt()
+        
+    # # Added: ADITI
+    # # --- ADD THIS BLOCK TO FIX THE DISTRIBUTED INITIALIZATION ERROR ---
+    # if torch.cuda.is_available():
+    #     # Set up for a single-process, single-GPU distributed environment.
+    #     # This is a common workaround for models that expect a distributed
+    #     # setup even for single-GPU inference.
+    #     os.environ.setdefault('MASTER_ADDR', '127.0.0.1')
+    #     os.environ.setdefault('MASTER_PORT', '12355') # Use any free port
+    #     torch.distributed.init_process_group(
+    #         backend='nccl',  # 'nccl' is recommended for NVIDIA GPUs
+    #         init_method='env://',
+    #         world_size=1,
+    #         rank=0
+    #     )
+    # # --- END OF BLOCK ---
+    
     test(opt)

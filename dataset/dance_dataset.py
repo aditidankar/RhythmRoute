@@ -8,9 +8,15 @@ from typing import Any
 
 import numpy as np
 import torch
-from pytorch3d.transforms import (RotateAxisAngle, axis_angle_to_quaternion,
+from pytorch3d.transforms import (RotateAxisAngle, 
+                                #   axis_angle_to_quaternion,
                                   quaternion_multiply,
-                                  quaternion_to_axis_angle)
+                                #   quaternion_to_axis_angle
+                                  )
+from pytorch3d.transforms.rotation_conversions import (axis_angle_to_quaternion,
+                                                       quaternion_to_axis_angle,
+                                                       )
+
 from torch.utils.data import Dataset
 
 from dataset.preprocess import Normalizer, vectorize_many
@@ -68,9 +74,12 @@ class AISTPPDataset(Dataset):
         )
 
         # process data, convert to 6dof etc
-        pose_input = self.process_dataset(data["pos"], data["q"])
+        # pose_input = self.process_dataset(data["pos"], data["q"])
+        pose_input, root_trajectories = self.process_dataset(data["pos"], data["q"]) # Added root_trajectories: ADITI
+        
         self.data = {
             "pose": pose_input,
+            "root_trajectory": root_trajectories, # Added: ADITI
             "filenames": data["filenames"],
             "wavs": data["wavs"],
         }
@@ -83,7 +92,8 @@ class AISTPPDataset(Dataset):
     def __getitem__(self, idx):
         filename_ = self.data["filenames"][idx]
         feature = torch.from_numpy(np.load(filename_))
-        return self.data["pose"][idx], feature, filename_, self.data["wavs"][idx]
+        # return self.data["pose"][idx], feature, filename_, self.data["wavs"][idx]
+        return self.data["pose"][idx], feature, self.data["root_trajectory"][idx], filename_, self.data["wavs"][idx] # Added root_trajectory: ADITI
 
     def load_aistpp(self):
         # open data path
@@ -197,7 +207,7 @@ class AISTPPDataset(Dataset):
 
         print(f"{data_name} Dataset Motion Features Dim: {global_pose_vec_input.shape}")
 
-        return global_pose_vec_input
+        return global_pose_vec_input, root_pos # Added root_pos: ADITI
 
 
 class OrderedMusicDataset(Dataset):

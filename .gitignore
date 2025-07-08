@@ -11,6 +11,7 @@ __pycache__/
 # Experiment outputs and logs
 runs/
 wandb/
+logs/
 
 # Generated media files
 renders/
@@ -18,20 +19,26 @@ edge_aistpp/
 
 # Data and data-related folders
 # This single line ignores the entire /data directory and its contents
-data/train/
-data/test/
-data/dataset_backups/
+data/train
+data/test
+data/dataset_backups
+data/dataset_backups_original
 
 # Other data/cache folders
 train/
 test/
 dataset_backups/
 cached_features/
-custom_music/
+custom_music
 custom_music_one_song/
 
 # Specific file types to ignore
 # =================================
+dataset/dance_dataset1.py
+training_script.sh
+vis1.py
+interactive_session.sh
+visualize_path.ipynb
 
 # Media files
 *.gif

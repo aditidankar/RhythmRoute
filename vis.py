@@ -10,8 +10,11 @@ import soundfile as sf
 import torch
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
-from pytorch3d.transforms import (axis_angle_to_quaternion, quaternion_apply,
+from pytorch3d.transforms import (
+                                #   axis_angle_to_quaternion, 
+                                  quaternion_apply,
                                   quaternion_multiply)
+from pytorch3d.transforms.rotation_conversions import axis_angle_to_quaternion
 from tqdm import tqdm
 
 smpl_joints = [
@@ -126,7 +129,16 @@ def get_axrange(poses):
     return biggestdiff
 
 
-def plot_single_pose(num, poses, lines, ax, axrange, scat, contact):
+def plot_single_pose(num, poses, lines, traj_line, root_dot, ax, axrange, scat, contact):
+    # --- Update trajectory ---
+    root_traj = poses[:num+1, 0, :]              # all points up to current frame
+    traj_line.set_data(root_traj[:, 0], root_traj[:, 1])
+    traj_line.set_3d_properties(root_traj[:, 2])
+    
+    # --- Update moving root dot to the current frame ---
+    curr = poses[num, 0, :]
+    root_dot._offsets3d = ([curr[0]], [curr[1]], [curr[2]])
+
     pose = poses[num]
     static = contact[num]
     indices = [7, 8, 10, 11]
@@ -144,19 +156,19 @@ def plot_single_pose(num, poses, lines, ax, axrange, scat, contact):
         data = np.stack((pose[i], pose[p]), axis=0)
         set_line_data_3d(line, data)
 
-    if num == 0:
-        if isinstance(axrange, int):
-            axrange = (axrange, axrange, axrange)
-        xcenter, ycenter, zcenter = 0, 0, 2.5
-        stepx, stepy, stepz = axrange[0] / 2, axrange[1] / 2, axrange[2] / 2
+    # if num == 0:
+    #     if isinstance(axrange, int):
+    #         axrange = (axrange, axrange, axrange)
+    #     xcenter, ycenter, zcenter = 0, 0, 2.5
+    #     stepx, stepy, stepz = axrange[0] / 2, axrange[1] / 2, axrange[2] / 2
 
-        x_min, x_max = xcenter - stepx, xcenter + stepx
-        y_min, y_max = ycenter - stepy, ycenter + stepy
-        z_min, z_max = zcenter - stepz, zcenter + stepz
+    #     x_min, x_max = xcenter - stepx, xcenter + stepx
+    #     y_min, y_max = ycenter - stepy, ycenter + stepy
+    #     z_min, z_max = zcenter - stepz, zcenter + stepz
 
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
-        ax.set_zlim(z_min, z_max)
+    #     ax.set_xlim(x_min, x_max)
+    #     ax.set_ylim(y_min, y_max)
+    #     ax.set_zlim(z_min, z_max)
 
 
 def skeleton_render(
@@ -184,7 +196,20 @@ def skeleton_render(
         xx, yy = np.meshgrid(np.linspace(-1.5, 1.5, 2), np.linspace(-1.5, 1.5, 2))
         z = (-normal[0] * xx - normal[1] * yy - d) * 1.0 / normal[2]
         # plot the plane
-        ax.plot_surface(xx, yy, z, zorder=-11, cmap=cm.twilight)
+        ax.plot_surface(xx, yy, z, zorder=-11, cmap=cm.twilight, alpha=0.3, edgecolor='none')
+        
+        # =====================================================================
+        # Added: Aditi
+        # PLOT THE ROOT TRAJECTORY ON THE GROUND
+        
+        # Create a Line3D for the root trajectory
+        traj_line, = ax.plot([], [], [], linestyle='-', linewidth=2, color='blue', label='Root Traj')
+        root_dot = ax.scatter([], [], [], color='blue', s=50, label='Root Pos')
+
+        ax.legend(loc='upper right')
+        
+        # =====================================================================
+        
         # Create lines initially without data
         lines = [
             ax.plot([], [], [], zorder=10, linewidth=1.5)[0]
@@ -194,7 +219,9 @@ def skeleton_render(
             ax.scatter([], [], [], zorder=10, s=0, cmap=ListedColormap(["r", "g", "b"]))
             for _ in range(4)
         ]
+        
         axrange = 3
+        # axrange = get_axrange(poses)
 
         # create contact labels
         feet = poses[:, (7, 8, 10, 11)]
@@ -204,13 +231,35 @@ def skeleton_render(
             contact = feetv < 0.01
         else:
             contact = contact > 0.95
+            
+        # =====================================================================
+        # Added: Aditi        
+        # use every joint at every frame:
+        
+        all_joints = poses.reshape(-1, 3)         # (T*J, 3)
+        pad = 0.2                                 # small margin
+        mins = all_joints.min(axis=0) - pad
+        maxs = all_joints.max(axis=0) + pad
+        # ax.set_xlim(mins[0], maxs[0])             # X axis
+        # ax.set_ylim(mins[1], maxs[1])             # Y axis
+        # ax.set_zlim(mins[2], maxs[2])             # Z axis
+        
+        center = (mins + maxs) / 2
+        plot_range = (maxs - mins).max() * 1.2 # Use the largest range and add 20% padding
+        
+        # Set the limits for each axis to be cubic and centered on the motion
+        ax.set_xlim(center[0] - plot_range / 2, center[0] + plot_range / 2)
+        ax.set_ylim(center[1] - plot_range / 2, center[1] + plot_range / 2)
+        ax.set_zlim(center[2] - plot_range / 2, center[2] + plot_range / 2)
+
+        # =====================================================================
 
         # Creating the Animation object
         anim = animation.FuncAnimation(
             fig,
             plot_single_pose,
             num_steps,
-            fargs=(poses, lines, ax, axrange, scat, contact),
+            fargs=(poses, lines, traj_line, root_dot, ax, axrange, scat, contact),
             interval=1000 // 30,
         )
     if sound:
