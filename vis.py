@@ -126,16 +126,28 @@ def get_axrange(poses):
     return biggestdiff
 
 
-def plot_single_pose(num, poses, lines, ax, axrange, scat, contact):
+def plot_single_pose(num, poses, lines, ax, axrange, scat, contact, traj_line, root_dot):
     pose = poses[num]
     static = contact[num]
     indices = [7, 8, 10, 11]
+    
+    # Get the trajectory up to current frame
+    root_traj = poses[:num+1, 0]
+    
+    traj_line.set_data(root_traj[:, 0], root_traj[:, 1])
+    traj_line.set_3d_properties(root_traj[:, 2])
+    
+    # Update current root position dot (use root joint, index 0)
+    curr = poses[num, 0, :]
+    root_dot._offsets3d = ([curr[0]], [curr[1]], [curr[2]])
 
+    # Update foot contact visualization
     for i, (point, idx) in enumerate(zip(scat, indices)):
         position = pose[idx : idx + 1]
         color = "r" if static[i] else "g"
         set_scatter_data_3d(point, position, color)
 
+    # Update skeleton lines
     for i, (p, line) in enumerate(zip(smpl_parents, lines)):
         # don't plot root
         if i == 0:
@@ -144,6 +156,7 @@ def plot_single_pose(num, poses, lines, ax, axrange, scat, contact):
         data = np.stack((pose[i], pose[p]), axis=0)
         set_line_data_3d(line, data)
 
+    # Set axis limits on first frame
     if num == 0:
         if isinstance(axrange, int):
             axrange = (axrange, axrange, axrange)
@@ -168,7 +181,8 @@ def skeleton_render(
     stitch=False,
     sound_folder="ood_sliced",
     contact=None,
-    render=True
+    render=True,
+    trajectory=False,
 ):
     if render:
         # generate the pose with FK
@@ -185,6 +199,24 @@ def skeleton_render(
         z = (-normal[0] * xx - normal[1] * yy - d) * 1.0 / normal[2]
         # plot the plane
         ax.plot_surface(xx, yy, z, zorder=-11, cmap=cm.twilight)
+
+        # Create a line for the root trajectory
+        if trajectory:
+            print(f"Creating trajectory visualization for {num_steps} frames")
+            traj_line, = ax.plot([], [], [], zorder=10,
+                                linestyle="-", linewidth=2, color="blue", 
+                                label="Root Trajectory", alpha=0.9)
+            
+            # Create a moving dot for current position
+            root_dot = ax.scatter([], [], [], zorder=10, color="red", 
+                                 s=50, label="Current Root", alpha=0.9)
+
+            ax.legend(loc='upper right')
+        else:
+            print("Trajectory visualization disabled")
+            traj_line = None
+            root_dot = None
+            
         # Create lines initially without data
         lines = [
             ax.plot([], [], [], zorder=10, linewidth=1.5)[0]
@@ -210,7 +242,7 @@ def skeleton_render(
             fig,
             plot_single_pose,
             num_steps,
-            fargs=(poses, lines, ax, axrange, scat, contact),
+            fargs=(poses, lines, ax, axrange, scat, contact, traj_line, root_dot),
             interval=1000 // 30,
         )
     if sound:
