@@ -4,6 +4,7 @@ import pickle
 from functools import partial
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 import wandb
@@ -199,6 +200,22 @@ class EDGE:
             for step, (x, cond, root_traj, filename, wavnames) in enumerate(        # Added root_traj: ADITI
                 load_loop(train_data_loader)
             ):
+                # # ===================================================================================
+                # # Added: Aditi
+                # # Save an example root trajectory to a file only once per training run
+                # if self.accelerator.is_main_process and not hasattr(self, '_saved_trajectory'):
+                #     print("--- Saving ground truth example root trajectory to gt_trajectory_example.npy ---")
+                #     example_trajectory = root_traj[0].detach().cpu().numpy()
+                #     np.save("gt_trajectory_example.npy", example_trajectory)
+                    
+                #     print("--- Saving DE-NORMALIZED ground truth example pose sequence to gt_poses_example.npy ---")
+                #     denormalized_poses = self.normalizer.unnormalize(x) # un-normalize the 'x' tensor back to its real physical values
+                #     example_poses = denormalized_poses[0].detach().cpu().numpy()
+                #     np.save("gt_poses_example.npy", example_poses)
+                    
+                #     # Set a flag on the object so this block never runs again
+                #     self._saved_trajectory = True
+                # # ===================================================================================
                 total_loss, (loss, v_loss, fk_loss, foot_loss) = self.diffusion(
                     x, cond, t_override=None
                 )

@@ -22,6 +22,7 @@ def parse_train_opt():
     )
     parser.add_argument("--batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--epochs", type=int, default=2000)
+    parser.add_argument("--learning_rate", type=float, default=4e-4, help="optimizer learning rate")
     parser.add_argument(
         "--force_reload", action="store_true", help="force reloads the datasets"
     )

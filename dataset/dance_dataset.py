@@ -177,6 +177,25 @@ class AISTPPDataset(Dataset):
 
         # do FK
         positions = smpl.forward(local_q, root_pos)  # batch x sequence x 24 x 3
+        
+        # # Added: ADITI
+        # # ==============================================================================================
+        # # Save an example of ground truth poses and root trajectory     
+        # # .detach().cpu().numpy() is the standard way to convert a PyTorch tensor to a NumPy array
+        
+        # # This check ensures we only save one file, not for every batch
+        # if not os.path.exists("gt_poses_example.npy"):
+        #     print("--- Saving ground truth example pose sequence to gt_poses_example.npy ---")
+        #     # We take the first dance in the batch [0]
+        #     example_poses = positions[0].detach().cpu().numpy()
+        #     np.save("gt_poses_example.npy", example_poses)
+
+        # if not os.path.exists("gt_trajectory_example.npy"):
+        #     print("--- Saving ground truth example root trajectory to gt_trajectory_example.npy ---")
+        #     example_trajectory = root_pos[0].detach().cpu().numpy()
+        #     np.save("gt_trajectory_example.npy", example_trajectory)
+        # # ==============================================================================================
+        
         feet = positions[:, :, (7, 8, 10, 11)]
         feetv = torch.zeros(feet.shape[:3])
         feetv[:, :-1] = (feet[:, 1:] - feet[:, :-1]).norm(dim=-1)

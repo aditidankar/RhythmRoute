@@ -1,9 +1,11 @@
 # visualize_ground_truth.py
 import numpy as np
 import os
+import torch
 
-# Import the rendering function from the EDGE codebase
-from vis import skeleton_render
+# --- Import the necessary tools from the EDGE codebase ---
+from vis import skeleton_render, SMPLSkeleton
+from dataset.quaternion import ax_from_6v
 
 # --- Configuration ---
 POSES_FILE = 'gt_poses_example.npy'
@@ -14,41 +16,63 @@ OUTPUT_DIR = "renders/ground_truth_visualization"
 print("--- Starting Ground Truth Visualization ---")
 
 try:
-    # Load the ground truth pose and trajectory data
-    print(f"Loading poses from '{POSES_FILE}'...")
-    poses = np.load(POSES_FILE)
-    print(f"Loading trajectory from '{TRAJECTORY_FILE}'...")
-    trajectory = np.load(TRAJECTORY_FILE)
+    # 1. Load the raw pose feature vectors
+    print(f"Loading pose features from '{POSES_FILE}'...")
+    pose_feature_vectors = np.load(POSES_FILE) # Shape is (150, 151)
     
-    print(f"\nLoaded poses with shape: {poses.shape}")
-    print(f"Loaded trajectory with shape: {trajectory.shape}")
-    # Expected shapes: (Sequence Length, 24, 3) and (Sequence Length, 3)
+    # 2. Load the root trajectory
+    print(f"Loading trajectory from '{TRAJECTORY_FILE}'...")
+    root_trajectory = np.load(TRAJECTORY_FILE) # Shape is (150, 3)
+    
+    print(f"\nLoaded pose features with shape: {pose_feature_vectors.shape}")
+    print(f"Loaded trajectory with shape: {root_trajectory.shape}")
 
 except FileNotFoundError:
     print("\nERROR: Ground truth data files not found.")
-    print("Please run the training script with --force_reload to generate them first.")
+    print("Please run the training script to generate them first.")
     exit()
 
-# The skeleton_render function requires the root trajectory to be plotted separately.
-# We will modify the vis.py script to handle this. For now, let's just render the skeleton.
+# --- DECODE THE DATA AND RECONSTRUCT THE SKELETON ---
+print("\nReconstructing 3D skeleton from loaded data...")
 
-# We will create a dummy "name" for the output file
+# A. Prepare the Rotations
+# Convert pose features to a PyTorch Tensor
+pose_features_tensor = torch.from_numpy(pose_feature_vectors).float()
+# Extract just the rotation data (the last 144 components of the vector)
+rotations_6d = pose_features_tensor[:, 7:]
+# Reshape from a flat (150, 144) to a structured (150, 24, 6)
+rotations_6d = rotations_6d.reshape(-1, 24, 6)
+# Convert the 6D rotations back to the axis-angle format needed for FK
+rotations_ax = ax_from_6v(rotations_6d)
+
+# B. Prepare the Trajectory
+# Convert the trajectory to a PyTorch Tensor
+root_pos_tensor = torch.from_numpy(root_trajectory).float()
+
+# C. Perform Forward Kinematics (FK)
+print("Performing Forward Kinematics...")
+smpl = SMPLSkeleton()
+# The FK function expects a batch dimension, so we add one with .unsqueeze(0)
+final_poses = smpl.forward(rotations_ax.unsqueeze(0), root_pos_tensor.unsqueeze(0))
+# Remove the batch dimension for rendering and convert back to NumPy
+final_poses = final_poses.squeeze(0).detach().cpu().numpy()
+
+print(f"Successfully reconstructed skeleton. Final shape: {final_poses.shape}")
+
+# --- RENDER THE ANIMATION ---
 output_name = os.path.join(OUTPUT_DIR, "ground_truth_dance")
+print(f"\nRendering animation to '{OUTPUT_DIR}'...")
 
-print(f"\nRendering animation. The output will be saved in the '{OUTPUT_DIR}' directory.")
-print("This may take a moment...")
-
-# Call the rendering function with the loaded ground truth poses
+# Now, call the rendering function with the correctly formatted poses
 skeleton_render(
-    poses=poses,
-    epoch=0, # Just a label for the filename
+    poses=final_poses, # Use the (150, 24, 3) final positions
+    epoch="gt",
     out=OUTPUT_DIR,
     name=output_name,
-    sound=False, # We don't have the corresponding audio, so we set this to False
-    stitch=False,
-    contact=None,
+    sound=False,
+    contact=None, # We don't have contact data, so we leave this as None
     render=True
 )
 
 print(f"\nSuccessfully rendered ground truth animation.")
-print(f"Check the '{OUTPUT_DIR}' directory for a .gif file named '{os.path.basename(output_name)}.gif'.")
+print(f"Check the '{OUTPUT_DIR}' directory for a .gif file.")
