@@ -5,6 +5,7 @@ import torch
 from einops import rearrange, reduce, repeat
 from einops.layers.torch import Rearrange
 from torch import nn
+import random
 
 
 # absolute positional embedding used for vanilla transformer sequential data
@@ -97,3 +98,39 @@ def make_beta_schedule(
     else:
         raise ValueError(f"schedule '{schedule}' unknown.")
     return betas.numpy()
+
+
+def trajectory_masking(x, mask_rates, max_mask_len = 15, joint_mask = 5):
+    x_using = x.clone()
+    T = x_using.size(1)
+    data_dim = x_using.size(-1)
+    
+    mask = torch.ones_like(x_using[:, :, :, 0])
+    mask_joints = None
+    rand_number = random.random()
+    
+    if rand_number < 0.1:
+        return x_using
+
+    if joint_mask is not None and rand_number < 0.8:
+        mask_joints = random.sample([0,1,2,3,4,5], 5)
+        mask[:, :, mask_joints] *= .0
+    else:
+        for i, mask_rate in enumerate(mask_rates):
+            total_masked = 0
+            need_masked = int(round(mask_rate * T))
+            while total_masked < need_masked:
+                center = torch.randint(0, T, (1,)).item()
+                if total_masked < need_masked - max_mask_len:
+                    length = torch.randint(1, max_mask_len+1, (1,)).item()
+                else:
+                    length = need_masked - total_masked
+                    
+                left = max(0, center - length // 2)
+                right = min(T, left + length)
+
+                mask[:, left:right, i] *= .0
+                total_masked = int(T - torch.sum(mask[0, :, i]).item())
+    mask = mask.unsqueeze(-1)
+    mask = mask.repeat(1, 1, 1, data_dim)
+    return x_using * mask
