@@ -105,6 +105,73 @@ class TransformerEncoderLayer(nn.Module):
         return self.dropout2(x)
 
 
+# Trajectory Encoder
+class TrajectoryTransformerEncoder(nn.Module):
+    def __init__(self, seq_len=150, input_dim=3, model_dim=512, num_heads=4, num_layers=4, dropout=0.1):
+        """        
+        Args:
+            seq_len    (int) : The length of the input sequence (150 for EDGE).
+            input_dim  (int) : The dimension of the input coordinates (3 for x,y,z).
+            model_dim  (int) : The main working dimension of the Transformer.
+            num_heads  (int) : The number of attention heads in the Transformer.
+            num_layers (int) : The number of layers in the Transformer.
+            dropout  (float) : The dropout rate for the Transformer.
+        """
+        super(TrajectoryTransformerEncoder, self).__init__()
+
+        self.linear_in = nn.Linear(input_dim, model_dim)
+        self.pos_encoder = PositionalEncoding(model_dim, dropout)
+        
+        encoder_layers = nn.TransformerEncoderLayer(
+            d_model=model_dim,
+            nhead=num_heads,
+            dim_feedforward=model_dim * 4,
+            dropout=dropout
+        )
+        self.transformer_encoder = nn.TransformerEncoder(
+            encoder_layer=encoder_layers,
+            num_layers=num_layers
+        )
+        
+        # Load the saved mean and std for normalization
+        try:
+            mean = torch.load("./traj_mean.pt")
+            std = torch.load("./traj_std.pt")
+        except FileNotFoundError:
+            raise RuntimeError("Normalization files traj_mean.pt and traj_std.pt not found." 
+                             "Please run the data processing once to generate them.")
+        
+        # Register as buffers to ensure they are moved to the correct device
+        self.register_buffer("mean", mean)
+        self.register_buffer("std", std)
+            
+    def forward(self, x):
+        # x: [B, 150, 3]
+        
+        # Normalize the input trajectory
+        x = self.normalize(x) # Shape: [B, 150, 3]
+
+        x = self.linear_in(x)  # Shape: [B, 150, 512]
+        x = x.permute(1, 0, 2) # Shape: [150, B, 512], PyTorch Transformers expect (Seq, Batch, Feat)
+        x = self.pos_encoder(x)
+        trajectory_features = self.transformer_encoder(x)          # Shape: [150, B, 512]
+        trajectory_features = trajectory_features.permute(1, 0, 2) # Shape: [B, 150, 512]
+        return trajectory_features
+    
+    def normalize(self, x):
+        """
+        Normalizes the trajectory data.
+        """
+        return (x - self.mean) / self.std
+        
+    def unnormalize(self, x):
+        """
+        Denormalizes the trajectory data. This can be useful for visualization or evaluation.
+        Assumes x is in the normalized format.
+        """
+        return x * self.std + self.mean
+
+
 class FiLMTransformerDecoderLayer(nn.Module):
     def __init__(
         self,
