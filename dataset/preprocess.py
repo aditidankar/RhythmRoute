@@ -52,3 +52,26 @@ def vectorize_many(data):
 
     global_pose_vec_gt = torch.cat(out, dim=2)
     return global_pose_vec_gt
+
+
+# # This class is used to normalize trajectories in the dataset.
+class ZNormalizer:
+    def __init__(self, data, save=False):
+        if save:
+            traj_std, traj_mean  = torch.std_mean(data, dim=0)
+            torch.save(traj_std,  "./traj_std.pt")
+            torch.save(traj_mean, "./traj_mean.pt")
+        
+    def normalize(self, data):
+        # Normalize trajectory
+        # Load precomputed train std and mean
+        traj_std = torch.load( "./traj_std.pt").to(data.device)
+        traj_mean = torch.load( "./traj_mean.pt").to(data.device)
+        return (data - traj_mean) / traj_std
+    
+    def unnormalize(self, data):
+        # Inverse normalize trajectory
+        # Load precomputed train std and mean
+        traj_std = torch.load( "./traj_std.pt").to(data.device)
+        traj_mean = torch.load( "./traj_mean.pt").to(data.device)
+        return data * traj_std + traj_mean
