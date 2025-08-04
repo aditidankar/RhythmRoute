@@ -40,6 +40,8 @@ training_script1.sh
 vis1.py
 interactive_session.sh
 visualize_path.ipynb
+dataset/preprocess1.py
+dataset/scaler1.py
 
 # Media files
 *.gif
