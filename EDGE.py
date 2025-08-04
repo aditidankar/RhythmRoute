@@ -42,17 +42,18 @@ class EDGE:
         self.accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
         state = AcceleratorState()
         num_processes = state.num_processes
+        
         use_baseline_feats = feature_type == "baseline"
 
-        pos_dim = 3
+        pos_dim = 3 # 3d root position
         rot_dim = 24 * 6  # 24 joints, 6dof
-        self.repr_dim = repr_dim = pos_dim + rot_dim + 4
+        self.repr_dim = repr_dim = pos_dim + rot_dim + 4 # representation dimension: 3d position + 24 joints + 4 binary foot contacts
 
-        feature_dim = 35 if use_baseline_feats else 4800
+        feature_dim = 35 if use_baseline_feats else 4800 # 35 if using librosa features, 4800 if using jukebox features
 
-        horizon_seconds = 5
-        FPS = 30
-        self.horizon = horizon = horizon_seconds * FPS
+        horizon_seconds = 5 # 5 seconds of dance
+        FPS = 30 # 30 frames per second
+        self.horizon = horizon = horizon_seconds * FPS # 150 frames
 
         self.accelerator.wait_for_everyone()
 
@@ -64,15 +65,15 @@ class EDGE:
             self.normalizer = checkpoint["normalizer"]
 
         model = DanceDecoder(
-            nfeats=repr_dim,
-            seq_len=horizon,
-            latent_dim=512,
-            ff_size=1024,
-            num_layers=8,
-            num_heads=8,
-            dropout=0.1,
-            cond_feature_dim=feature_dim,
-            activation=F.gelu,
+            nfeats=repr_dim, # number of features in the input sequence 
+            seq_len=horizon, # sequence length (150 frames)
+            latent_dim=512,  # latent dimension
+            ff_size=1024,    # feedforward size
+            num_layers=8,    # number of layers
+            num_heads=8,     # number of attention heads (8 heads per layer)
+            dropout=0.1,     # dropout rate
+            cond_feature_dim=feature_dim, # dimension of the conditioning features
+            activation=F.gelu, # activation function
         )
 
         smpl = SMPLSkeleton(self.accelerator.device)
@@ -83,7 +84,7 @@ class EDGE:
             smpl,
             schedule="cosine",
             n_timestep=1000,
-            predict_epsilon=False,
+            predict_epsilon=False, # predict noise instead of the original data
             loss_type="l2",
             use_p2=False,
             cond_drop_prob=0.25,
@@ -196,9 +197,10 @@ class EDGE:
             avg_footloss = 0
             # train
             self.train()
-            for step, (x, cond, root_traj, filename, wavnames) in enumerate(        # Added root_traj: ADITI
+            for step, (x, cond, filename, wavnames) in enumerate(
                 load_loop(train_data_loader)
             ):
+                # loss: reconstruction loss, v_loss: velocity loss, fk_loss: joint loss, foot_loss: foot contact loss
                 total_loss, (loss, v_loss, fk_loss, foot_loss) = self.diffusion(
                     x, cond, t_override=None
                 )
@@ -250,7 +252,7 @@ class EDGE:
                     shape = (render_count, self.horizon, self.repr_dim)
                     print("Generating Sample")
                     # draw a music from the test dataset
-                    (x, cond, root_traj, filename, wavnames) = next(iter(test_data_loader))     # Added root_traj: ADITI
+                    (x, cond, filename, wavnames) = next(iter(test_data_loader))
                     cond = cond.to(self.accelerator.device)
                     self.diffusion.render_sample(
                         shape,
