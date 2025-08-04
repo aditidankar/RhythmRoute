@@ -111,7 +111,7 @@ def trajectory_masking(x, mask_rates, max_mask_len = 15, joint_mask = 5):
     
     if rand_number < 0.1:
         return x_using
-
+    
     if joint_mask is not None and rand_number < 0.8:
         mask_joints = random.sample([0,1,2,3,4,5], 5)
         mask[:, :, mask_joints] *= .0
@@ -134,3 +134,59 @@ def trajectory_masking(x, mask_rates, max_mask_len = 15, joint_mask = 5):
     mask = mask.unsqueeze(-1)
     mask = mask.repeat(1, 1, 1, data_dim)
     return x_using * mask
+
+
+def root_trajectory_masking(x, mask_rate, max_mask_len=15):
+    """
+    Applies masking to a single root trajectory for data augmentation.
+    The input is expected to be a 3D tensor of shape [B, T, D].
+
+    The masking strategy is probabilistic:
+    - 25% chance: No masking is applied.
+    - 25% chance: The entire trajectory is masked (set to 0).
+    - 50% chance: Sequential masking is applied, where segments of the
+                  trajectory are masked based on the mask_rate.
+
+    Args:
+        x (Tensor): The input trajectory tensor of shape [B, T, D].
+        mask_rate (float): The proportion of the sequence to mask during
+                           sequential masking.
+        max_mask_len (int): The maximum length of a single masked segment.
+
+    Returns:
+        Tensor: The masked trajectory tensor.
+    """
+    x_using = x.clone()
+    B, T, D = x_using.shape
+
+    rand_number = random.random()
+
+    if rand_number < 0.25:
+        # 25% chance: No masking
+        return x_using
+    if rand_number < 0.50:
+        # 25% chance: Mask the entire trajectory
+        return torch.zeros_like(x_using)
+    else:
+        # 50% chance: Sequential masking
+        mask = torch.ones(B, T, device=x.device)
+        
+        need_masked = int(round(mask_rate * T))
+        total_masked = 0
+
+        while total_masked < need_masked:
+            center = torch.randint(0, T, (1,)).item()
+            if total_masked < need_masked - max_mask_len:
+                length = torch.randint(1, max_mask_len+1, (1,)).item()
+            else:
+                length = need_masked - total_masked
+            
+            left = max(0, center - length // 2)
+            right = min(T, left + length)
+            
+            mask[:, left:right] = 0.0
+            
+            total_masked = T - int(mask[0, :].sum().item())
+
+        mask = mask.unsqueeze(-1).repeat(1, 1, D)
+        return x_using * mask
