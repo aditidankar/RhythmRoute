@@ -19,7 +19,7 @@ from pytorch3d.transforms.rotation_conversions import (axis_angle_to_quaternion,
 
 from torch.utils.data import Dataset
 
-from dataset.preprocess import Normalizer, vectorize_many
+from dataset.preprocess import Normalizer, vectorize_many, ZNormalizer
 from dataset.quaternion import ax_to_6v
 from vis import SMPLSkeleton
 
@@ -90,10 +90,13 @@ class AISTPPDataset(Dataset):
         return self.length
 
     def __getitem__(self, idx):
-        filename_ = self.data["filenames"][idx]
-        feature = torch.from_numpy(np.load(filename_))
-        # return self.data["pose"][idx], feature, filename_, self.data["wavs"][idx]
-        return self.data["pose"][idx], feature, self.data["root_trajectory"][idx], filename_, self.data["wavs"][idx] # Added root_trajectory: ADITI
+        music_filename_ = self.data["filenames"][idx]
+        music_feature = torch.from_numpy(np.load(music_filename_))
+        
+        feature = {"music": music_feature}
+        feature["trajectory"] = self.data["root_trajectory"][idx]
+
+        return self.data["pose"][idx], feature, music_filename_, self.data["wavs"][idx]      
 
     def load_aistpp(self):
         # open data path
@@ -153,11 +156,11 @@ class AISTPPDataset(Dataset):
         # FK skeleton
         smpl = SMPLSkeleton()
         # to Tensor
-        root_pos = torch.Tensor(root_pos)
+        root_pos = torch.Tensor(root_pos) # shape: [B, seq, 3]
         local_q = torch.Tensor(local_q)
         # to ax
         bs, sq, c = local_q.shape
-        local_q = local_q.reshape((bs, sq, -1, 3))
+        local_q = local_q.reshape((bs, sq, -1, 3)) # shape: [B, seq, 24, 3]
 
         # AISTPP dataset comes y-up - rotate to z-up to standardize against the pretrain dataset
         root_q = local_q[:, :, :1, :]  # sequence x 1 x 3
@@ -206,7 +209,11 @@ class AISTPPDataset(Dataset):
         global_pose_vec_input = global_pose_vec_input
 
         print(f"{data_name} Dataset Motion Features Dim: {global_pose_vec_input.shape}")
-
+        
+        # Normalize root trajectory and save std and mean as pt files (run once)
+        # traj_normalizer = ZNormalizer(root_pos, save=False) # save=True to save std and mean
+        # root_pos = traj_normalizer.normalize(root_pos)
+        
         return global_pose_vec_input, root_pos # Added root_pos: ADITI
 
 
