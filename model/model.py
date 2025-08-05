@@ -9,7 +9,7 @@ from torch import Tensor
 from torch.nn import functional as F
 
 from model.rotary_embedding_torch import RotaryEmbedding
-from model.utils import PositionalEncoding, SinusoidalPosEmb, prob_mask_like
+from model.utils import PositionalEncoding, SinusoidalPosEmb, prob_mask_like, root_trajectory_masking
 
 
 class DenseFiLM(nn.Module):
@@ -107,7 +107,15 @@ class TransformerEncoderLayer(nn.Module):
 
 # Trajectory Encoder
 class TrajectoryTransformerEncoder(nn.Module):
-    def __init__(self, seq_len=150, input_dim=3, model_dim=512, num_heads=4, num_layers=4, dropout=0.1):
+    def __init__(
+        self, 
+        seq_len=150, 
+        input_dim=3, 
+        model_dim=512, 
+        num_heads=4, 
+        num_layers=4, 
+        dropout=0.1
+        ):
         """        
         Args:
             seq_len    (int) : The length of the input sequence (150 for EDGE).
@@ -120,13 +128,18 @@ class TrajectoryTransformerEncoder(nn.Module):
         super(TrajectoryTransformerEncoder, self).__init__()
 
         self.linear_in = nn.Linear(input_dim, model_dim)
-        self.pos_encoder = PositionalEncoding(model_dim, dropout)
+        self.pos_encoder = PositionalEncoding(
+            d_model=model_dim, 
+            dropout=dropout, 
+            batch_first=True
+            )
         
         encoder_layers = nn.TransformerEncoderLayer(
             d_model=model_dim,
             nhead=num_heads,
             dim_feedforward=model_dim * 4,
-            dropout=dropout
+            dropout=dropout,
+            batch_first=True
         )
         self.transformer_encoder = nn.TransformerEncoder(
             encoder_layer=encoder_layers,
@@ -147,15 +160,11 @@ class TrajectoryTransformerEncoder(nn.Module):
             
     def forward(self, x):
         # x: [B, 150, 3]
-        
-        # Normalize the input trajectory
-        x = self.normalize(x) # Shape: [B, 150, 3]
-
+        # Project the input trajectory to the model dimension
         x = self.linear_in(x)  # Shape: [B, 150, 512]
-        x = x.permute(1, 0, 2) # Shape: [150, B, 512], PyTorch Transformers expect (Seq, Batch, Feat)
-        x = self.pos_encoder(x)
-        trajectory_features = self.transformer_encoder(x)          # Shape: [150, B, 512]
-        trajectory_features = trajectory_features.permute(1, 0, 2) # Shape: [B, 150, 512]
+        
+        x = self.pos_encoder(x) # Shape: [B, 150, 512]
+        trajectory_features = self.transformer_encoder(x) # Shape: [B, 150, 512]
         return trajectory_features
     
     def normalize(self, x):
@@ -306,13 +315,15 @@ class DanceDecoder(nn.Module):
     def __init__(
         self,
         nfeats: int,
-        seq_len: int = 150,  # 5 seconds, 30 fps
-        latent_dim: int = 256,
+        seq_len: int = 150,    # 5 seconds, 30 fps
+        latent_dim: int = 256, # 512
         ff_size: int = 1024,
-        num_layers: int = 4,
-        num_heads: int = 4,
+        num_layers: int = 4, # 8
+        num_heads: int = 4,  # 8
         dropout: float = 0.1,
-        cond_feature_dim: int = 4800,
+        music_feature_dim: int = 4800,
+        trajectory_feature_dim: int = 3,
+        mask_rate: float = 0.25,
         activation: Callable[[Tensor], Tensor] = F.gelu,
         use_rotary=True,
         **kwargs
@@ -321,6 +332,7 @@ class DanceDecoder(nn.Module):
         super().__init__()
 
         output_feats = nfeats
+        self.mask_rate = mask_rate
 
         # positional embeddings
         self.rotary = None
@@ -335,7 +347,7 @@ class DanceDecoder(nn.Module):
 
         # time embedding processing
         self.time_mlp = nn.Sequential(
-            SinusoidalPosEmb(latent_dim),  # learned?
+            SinusoidalPosEmb(latent_dim),
             nn.Linear(latent_dim, latent_dim * 4),
             nn.Mish(),
         )
@@ -355,6 +367,39 @@ class DanceDecoder(nn.Module):
 
         # input projection
         self.input_projection = nn.Linear(nfeats, latent_dim)
+        
+        # music projection
+        self.music_projection = nn.Linear(music_feature_dim, latent_dim)
+        
+        # music encoder
+        self.music_encoder = nn.Sequential()
+        for _ in range(2):
+            self.music_encoder.append(
+                TransformerEncoderLayer(
+                    d_model=latent_dim,
+                    nhead=num_heads,
+                    dim_feedforward=ff_size,
+                    dropout=dropout,
+                    activation=activation,
+                    batch_first=True,
+                    rotary=self.rotary,
+                )
+            )
+        
+        # trajectory encoder
+        self.trajectory_encoder = TrajectoryTransformerEncoder(
+            seq_len=seq_len,
+            input_dim=trajectory_feature_dim,
+            model_dim=latent_dim,
+            num_heads=4,
+            num_layers=4,
+            dropout=dropout
+        )
+
+        # conditional projection
+        self.cond_projection = nn.Linear(latent_dim, latent_dim)
+            
+        # cross modal encoder
         self.cond_encoder = nn.Sequential()
         for _ in range(2):
             self.cond_encoder.append(
@@ -368,14 +413,14 @@ class DanceDecoder(nn.Module):
                     rotary=self.rotary,
                 )
             )
-        # conditional projection
-        self.cond_projection = nn.Linear(cond_feature_dim, latent_dim)
+        
         self.non_attn_cond_projection = nn.Sequential(
             nn.LayerNorm(latent_dim),
             nn.Linear(latent_dim, latent_dim),
             nn.SiLU(),
             nn.Linear(latent_dim, latent_dim),
         )
+                        
         # decoder
         decoderstack = nn.ModuleList([])
         for _ in range(num_layers):
@@ -413,38 +458,53 @@ class DanceDecoder(nn.Module):
 
         # create music conditional embedding with conditional dropout
         keep_mask = prob_mask_like((batch_size,), 1 - cond_drop_prob, device=device)
-        keep_mask_embed = rearrange(keep_mask, "b -> b 1 1")
+        keep_mask_embed  = rearrange(keep_mask, "b -> b 1 1")
         keep_mask_hidden = rearrange(keep_mask, "b -> b 1")
+                
+        cond_embed_music      = cond_embed["music"]
+        cond_embed_trajectory = cond_embed["trajectory"]
+        
+        # trajectory encoding
+        normalized_trajectory = self.trajectory_encoder.normalize(cond_embed_trajectory)                 # Shape: [B, 150, 3]
+        masked_trajectory     = root_trajectory_masking(normalized_trajectory, mask_rate=self.mask_rate) # Shape: [B, 150, 3]
+        trajectory_tokens     = self.trajectory_encoder(masked_trajectory)                               # Shape: [B, 150, 512]
 
-        cond_tokens = self.cond_projection(cond_embed)
-        # encode tokens
-        cond_tokens = self.abs_pos_encoding(cond_tokens)
-        cond_tokens = self.cond_encoder(cond_tokens)
+        # music encoding
+        music_tokens = self.music_projection(cond_embed_music) # Shape: [B, 150, 512]
+        music_tokens = self.abs_pos_encoding(music_tokens)     # Shape: [B, 150, 512]
+        music_tokens = self.music_encoder(music_tokens)        # Shape: [B, 150, 512]
 
+        # fuse music and trajectory tokens
+        cond_tokens = torch.cat((music_tokens, trajectory_tokens), dim=1) # Shape: [B, 300, 512]
+        cond_tokens = self.cond_projection(cond_tokens)                   # Shape: [B, 150, 512]
+        cond_tokens = self.abs_pos_encoding(cond_tokens)                  # Shape: [B, 150, 512]
+        cond_tokens = self.cond_encoder(cond_tokens)                      # Shape: [B, 150, 512]
+        
+        # guidance dropout
         null_cond_embed = self.null_cond_embed.to(cond_tokens.dtype)
-        cond_tokens = torch.where(keep_mask_embed, cond_tokens, null_cond_embed)
+        cond_tokens     = torch.where(keep_mask_embed, cond_tokens, null_cond_embed)
 
-        mean_pooled_cond_tokens = cond_tokens.mean(dim=-2)
-        cond_hidden = self.non_attn_cond_projection(mean_pooled_cond_tokens)
-
-        # create the diffusion timestep embedding, add the extra music projection
-        t_hidden = self.time_mlp(times)
+        # Global conditioning for FiLM
+        mean_pooled_cond_tokens = cond_tokens.mean(dim=1)                    # Shape: [B, 512]
+        cond_hidden = self.non_attn_cond_projection(mean_pooled_cond_tokens) # Shape: [B, 512]
+        
+        # create the diffusion timestep embedding, add the extra conditional projection
+        t_hidden = self.time_mlp(times) # Shape: [B, 2048]
 
         # project to attention and FiLM conditioning
-        t = self.to_time_cond(t_hidden)
-        t_tokens = self.to_time_tokens(t_hidden)
+        t = self.to_time_cond(t_hidden)          # Shape: [B, 512]
+        t_tokens = self.to_time_tokens(t_hidden) # Shape: [B, 2, 512]
 
-        # FiLM conditioning
+        # FiLM conditioning: add global context to diffusion timestep
         null_cond_hidden = self.null_cond_hidden.to(t.dtype)
         cond_hidden = torch.where(keep_mask_hidden, cond_hidden, null_cond_hidden)
         t += cond_hidden
 
-        # cross-attention conditioning
-        c = torch.cat((cond_tokens, t_tokens), dim=-2)
+        # Prepare for cross-attention: concatenate all context sources
+        c = torch.cat((cond_tokens, t_tokens), dim=1) # Shape: [B, 152, 512]
         cond_tokens = self.norm_cond(c)
 
         # Pass through the transformer decoder
-        # attending to the conditional embedding
         output = self.seqTransDecoder(x, cond_tokens, t)
 
         output = self.final_layer(output)
