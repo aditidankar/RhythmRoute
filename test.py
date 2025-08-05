@@ -45,20 +45,20 @@ def test(opt):
     temp_dir_list = []
     all_cond = []
     all_filenames = []
-    if opt.use_cached_features:
+    if opt.use_cached_features: # Updated - no sampling logic
         print("Using precomputed features")
-        # all subdirectories
-        dir_list = glob.glob(os.path.join(opt.feature_cache_dir, "*/"))
-        for dir in dir_list:
-            file_list = sorted(glob.glob(f"{dir}/*.wav"), key=stringintkey)
-            juke_file_list = sorted(glob.glob(f"{dir}/*.npy"), key=stringintkey)
-            assert len(file_list) == len(juke_file_list)
-            # random chunk after sanity check
-            rand_idx = random.randint(0, len(file_list) - sample_size)
-            file_list = file_list[rand_idx : rand_idx + sample_size]
-            juke_file_list = juke_file_list[rand_idx : rand_idx + sample_size]
-            cond_list = [np.load(x) for x in juke_file_list]
-            all_filenames.append(file_list)
+        # iterate through each slice directory and load all features
+        slice_dirs = sorted(glob.glob(os.path.join(opt.feature_cache_dir, "*/")))
+        for slice_dir in tqdm(slice_dirs, desc="Processing slices"):
+            wav_list  = sorted(glob.glob(f"{slice_dir}/*.wav"), key=stringintkey)
+            feat_list = sorted(glob.glob(f"{slice_dir}/*.npy"), key=stringintkey)
+            # Sanity check to ensure the number of audio files matches the number of feature files
+            if len(wav_list) != len(feat_list):
+                print(f"Warning: Mismatch in number of audio files and feature files in {slice_dir}")
+                continue
+            # Load features
+            cond_list = [np.load(f) for f in feat_list]
+            all_filenames.append(wav_list)
             all_cond.append(torch.from_numpy(np.array(cond_list)))
     else:
         print("Computing features for input music")
@@ -126,20 +126,19 @@ def test(opt):
 if __name__ == "__main__":
     opt = parse_test_opt()
         
-    # # Added: ADITI
-    # # --- ADD THIS BLOCK TO FIX THE DISTRIBUTED INITIALIZATION ERROR ---
-    # if torch.cuda.is_available():
-    #     # Set up for a single-process, single-GPU distributed environment.
-    #     # This is a common workaround for models that expect a distributed
-    #     # setup even for single-GPU inference.
-    #     os.environ.setdefault('MASTER_ADDR', '127.0.0.1')
-    #     os.environ.setdefault('MASTER_PORT', '12355') # Use any free port
-    #     torch.distributed.init_process_group(
-    #         backend='nccl',  # 'nccl' is recommended for NVIDIA GPUs
-    #         init_method='env://',
-    #         world_size=1,
-    #         rank=0
-    #     )
-    # # --- END OF BLOCK ---
+    # --- ADD THIS BLOCK TO FIX THE DISTRIBUTED INITIALIZATION ERROR ---
+    if torch.cuda.is_available():
+        # Set up for a single-process, single-GPU distributed environment.
+        # This is a common workaround for models that expect a distributed
+        # setup even for single-GPU inference.
+        os.environ.setdefault('MASTER_ADDR', '127.0.0.1')
+        os.environ.setdefault('MASTER_PORT', '12355') # Use any free port
+        torch.distributed.init_process_group(
+            backend='nccl',  # 'nccl' is recommended for NVIDIA GPUs
+            init_method='env://',
+            world_size=1,
+            rank=0
+        )
+    # --- END OF BLOCK ---
     
     test(opt)
