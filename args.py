@@ -18,7 +18,7 @@ def parse_train_opt():
 
     parser.add_argument("--feature_type", type=str, default="jukebox")
     parser.add_argument(
-        "--wandb_pj_name", type=str, default="EDGE", help="project name"
+        "--wandb_pj_name", type=str, default="EDGE_Trajectory", help="project name"
     )
     parser.add_argument("--batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--epochs", type=int, default=2000)
