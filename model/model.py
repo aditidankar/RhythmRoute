@@ -333,6 +333,7 @@ class DanceDecoder(nn.Module):
 
         output_feats = nfeats
         self.mask_rate = mask_rate
+        self.gt_trajectory_tokens = None
 
         # positional embeddings
         self.rotary = None
@@ -468,6 +469,9 @@ class DanceDecoder(nn.Module):
         normalized_trajectory = self.trajectory_encoder.normalize(cond_embed_trajectory)                 # Shape: [B, 150, 3]
         masked_trajectory     = root_trajectory_masking(normalized_trajectory, mask_rate=self.mask_rate) # Shape: [B, 150, 3]
         trajectory_tokens     = self.trajectory_encoder(masked_trajectory)                               # Shape: [B, 150, 512]
+
+        # store the ground truth trajectory tokens for loss calculation
+        self.gt_trajectory_tokens = self.trajectory_encoder(normalized_trajectory).detach()
 
         # music encoding
         music_tokens = self.music_projection(cond_embed_music) # Shape: [B, 150, 512]

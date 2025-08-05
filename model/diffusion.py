@@ -49,18 +49,19 @@ class EMA:
 class GaussianDiffusion(nn.Module):
     def __init__(
         self,
-        model,
-        horizon,
-        repr_dim,
-        smpl,
-        n_timestep=1000,
-        schedule="linear",
-        loss_type="l1",
+        model,                # DanceDecoder
+        horizon,              # 150
+        repr_dim,             # 512
+        smpl,                 # SMPLSkeleton
+        n_timestep=1000,      # 1000
+        schedule="linear",    # cosine
+        loss_type="l1",       # l2
         clip_denoised=True,
-        predict_epsilon=True,
-        guidance_weight=3,
-        use_p2=False,
-        cond_drop_prob=0.2,
+        predict_epsilon=True, # False
+        guidance_weight=3,    # 2
+        use_p2=False,         # False
+        cond_drop_prob=0.2,   # 0.25
+        normalizer=None,
     ):
         super().__init__()
         self.horizon = horizon
@@ -73,6 +74,7 @@ class GaussianDiffusion(nn.Module):
 
         # make a SMPL instance for FK module
         self.smpl = smpl
+        self.normalizer = normalizer
 
         betas = torch.Tensor(
             make_beta_schedule(schedule=schedule, n_timestep=n_timestep)
@@ -235,7 +237,8 @@ class GaussianDiffusion(nn.Module):
         start_point = self.n_timestep if start_point is None else start_point
         batch_size = shape[0]
         x = torch.randn(shape, device=device) if noise is None else noise.to(device)
-        cond = cond.to(device)
+        for k, v in cond.items():
+            cond[k] = v.to(device)
 
         if return_diffusion:
             diffusion = [x]
@@ -262,7 +265,8 @@ class GaussianDiffusion(nn.Module):
         time_pairs = list(zip(times[:-1], times[1:])) # [(T-1, T-2), (T-2, T-3), ..., (1, 0), (0, -1)]
 
         x = torch.randn(shape, device = device)
-        cond = cond.to(device)
+        for k, v in cond.items():
+            cond[k] = v.to(device)
 
         x_start = None
 
@@ -300,7 +304,8 @@ class GaussianDiffusion(nn.Module):
         time_pairs = list(zip(times[:-1], times[1:], weights)) # [(T-1, T-2), (T-2, T-3), ..., (1, 0), (0, -1)]
 
         x = torch.randn(shape, device = device)
-        cond = cond.to(device)
+        for k, v in cond.items():
+            cond[k] = v.to(device)
         
         assert batch > 1
         assert x.shape[1] % 2 == 0
@@ -347,7 +352,8 @@ class GaussianDiffusion(nn.Module):
 
         batch_size = shape[0]
         x = torch.randn(shape, device=device) if noise is None else noise.to(device)
-        cond = cond.to(device)
+        for k, v in cond.items():
+            cond[k] = v.to(device)
         if return_diffusion:
             diffusion = [x]
 
@@ -387,7 +393,8 @@ class GaussianDiffusion(nn.Module):
 
         batch_size = shape[0]
         x = torch.randn(shape, device=device) if noise is None else noise.to(device)
-        cond = cond.to(device)
+        for k, v in cond.items():
+            cond[k] = v.to(device)
         if return_diffusion:
             diffusion = [x]
 
@@ -468,6 +475,15 @@ class GaussianDiffusion(nn.Module):
         loss = self.loss_fn(model_out, target, reduction="none")
         loss = reduce(loss, "b ... -> b (...)", "mean")
         loss = loss * extract(self.p2_loss_weight, t, loss.shape)
+        
+        # trajectory loss
+        predicted_unnormalized_trajectory = self.normalizer.unnormalize(x_recon)[:, :, 4:7]
+        predicted_normalized_trajectory = self.model.trajectory_encoder.normalize(predicted_unnormalized_trajectory)
+        predicted_trajectory_tokens = self.model.trajectory_encoder(predicted_normalized_trajectory)
+        target_trajectory_tokens = self.model.gt_trajectory_tokens
+        trajectory_loss = self.loss_fn(predicted_trajectory_tokens, target_trajectory_tokens, reduction="none")
+        trajectory_loss = reduce(trajectory_loss, "b ... -> b (...)", "mean")
+        trajectory_loss = trajectory_loss * extract(self.p2_loss_weight, t, trajectory_loss.shape)
 
         # split off contact from the rest
         model_contact, model_out = torch.split(
@@ -522,6 +538,7 @@ class GaussianDiffusion(nn.Module):
             2.964 * v_loss.mean(),
             0.646 * fk_loss.mean(),
             10.942 * foot_loss.mean(),
+            1.0 * trajectory_loss.mean(),
         )
         return sum(losses), losses
 

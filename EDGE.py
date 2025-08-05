@@ -33,7 +33,7 @@ class EDGE:
         self,
         feature_type,
         checkpoint_path="",
-        normalizer=None,
+        # normalizer=None,
         EMA=True,
         learning_rate=4e-4,
         weight_decay=0.02,
@@ -49,7 +49,7 @@ class EDGE:
         rot_dim = 24 * 6  # 24 joints, 6dof
         self.repr_dim = repr_dim = pos_dim + rot_dim + 4 # representation dimension: 3d position + 24 joints + 4 binary foot contacts
 
-        feature_dim = 35 if use_baseline_feats else 4800 # 35 if using librosa features, 4800 if using jukebox features
+        music_feature_dim = 35 if use_baseline_feats else 4800 # 35 if using librosa features, 4800 if using jukebox features
 
         horizon_seconds = 5 # 5 seconds of dance
         FPS = 30 # 30 frames per second
@@ -57,6 +57,7 @@ class EDGE:
 
         self.accelerator.wait_for_everyone()
 
+        self.normalizer = None
         checkpoint = None
         if checkpoint_path != "":
             checkpoint = torch.load(
@@ -72,7 +73,9 @@ class EDGE:
             num_layers=8,    # number of layers
             num_heads=8,     # number of attention heads (8 heads per layer)
             dropout=0.1,     # dropout rate
-            cond_feature_dim=feature_dim, # dimension of the conditioning features
+            music_feature_dim=music_feature_dim, # dimension of the conditioning features
+            trajectory_feature_dim=3,            # dimension of the trajectory features
+            mask_rate=0.25,                      # mask rate for the trajectory features
             activation=F.gelu, # activation function
         )
 
@@ -89,6 +92,7 @@ class EDGE:
             use_p2=False,
             cond_drop_prob=0.25,
             guidance_weight=2,
+            normalizer=self.normalizer,
         )
 
         print(
@@ -107,6 +111,7 @@ class EDGE:
                     num_processes,
                 )
             )
+            self.optim.load_state_dict(checkpoint["optimizer_state_dict"]) # load optimizer state 
 
     def eval(self):
         self.diffusion.eval()
@@ -153,6 +158,7 @@ class EDGE:
 
         # set normalizer
         self.normalizer = test_dataset.normalizer
+        self.diffusion.normalizer = self.normalizer
 
         # data loaders
         # decide number of workers based on cpu count
@@ -161,7 +167,7 @@ class EDGE:
             train_dataset,
             batch_size=opt.batch_size,
             shuffle=True,
-            num_workers=min(int(num_cpus * 0.75), 32),
+            num_workers=min(int(num_cpus * 0.75), 8), # 32
             pin_memory=True,
             drop_last=True,
         )
@@ -195,13 +201,14 @@ class EDGE:
             avg_vloss = 0
             avg_fkloss = 0
             avg_footloss = 0
+            avg_trajectoryloss = 0
             # train
             self.train()
             for step, (x, cond, filename, wavnames) in enumerate(
                 load_loop(train_data_loader)
             ):
                 # loss: reconstruction loss, v_loss: velocity loss, fk_loss: joint loss, foot_loss: foot contact loss
-                total_loss, (loss, v_loss, fk_loss, foot_loss) = self.diffusion(
+                total_loss, (loss, v_loss, fk_loss, foot_loss, trajectory_loss) = self.diffusion(
                     x, cond, t_override=None
                 )
                 self.optim.zero_grad()
@@ -215,6 +222,7 @@ class EDGE:
                     avg_vloss += v_loss.detach().cpu().numpy()
                     avg_fkloss += fk_loss.detach().cpu().numpy()
                     avg_footloss += foot_loss.detach().cpu().numpy()
+                    avg_trajectoryloss += trajectory_loss.detach().cpu().numpy()
                     if step % opt.ema_interval == 0:
                         self.diffusion.ema.update_model_average(
                             self.diffusion.master_model, self.diffusion.model
@@ -231,11 +239,13 @@ class EDGE:
                     avg_vloss /= len(train_data_loader)
                     avg_fkloss /= len(train_data_loader)
                     avg_footloss /= len(train_data_loader)
+                    avg_trajectoryloss /= len(train_data_loader)
                     log_dict = {
                         "Train Loss": avg_loss,
                         "V Loss": avg_vloss,
                         "FK Loss": avg_fkloss,
                         "Foot Loss": avg_footloss,
+                        "Trajectory Loss": avg_trajectoryloss,
                     }
                     wandb.log(log_dict)
                     ckpt = {
