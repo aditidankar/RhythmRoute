@@ -109,14 +109,14 @@ def trajectory_masking(x, mask_rates, max_mask_len = 15, joint_mask = 5):
     mask_joints = None
     rand_number = random.random()
     
-    if rand_number < 0.1:
+    if rand_number < 0.1: # no masking
         return x_using
     
-    if joint_mask is not None and rand_number < 0.8:
+    if joint_mask is not None and rand_number < 0.8: # mask joints / spatial masking - 5 joints
         mask_joints = random.sample([0,1,2,3,4,5], 5)
         mask[:, :, mask_joints] *= .0
     else:
-        for i, mask_rate in enumerate(mask_rates):
+        for i, mask_rate in enumerate(mask_rates): # mask sequence / temporal masking
             total_masked = 0
             need_masked = int(round(mask_rate * T))
             while total_masked < need_masked:
@@ -136,15 +136,14 @@ def trajectory_masking(x, mask_rates, max_mask_len = 15, joint_mask = 5):
     return x_using * mask
 
 
-def root_trajectory_masking(x, mask_rate, max_mask_len=15):
+def root_trajectory_masking(x, mask_rate=0.25, max_mask_len=15):
     """
     Applies masking to a single root trajectory for data augmentation.
     The input is expected to be a 3D tensor of shape [B, T, D].
 
     The masking strategy is probabilistic:
     - 25% chance: No masking is applied.
-    - 25% chance: The entire trajectory is masked (set to 0).
-    - 50% chance: Sequential masking is applied, where segments of the
+    - 75% chance: Sequential masking is applied, where segments of the
                   trajectory are masked based on the mask_rate.
 
     Args:
@@ -164,11 +163,11 @@ def root_trajectory_masking(x, mask_rate, max_mask_len=15):
     if rand_number < 0.25:
         # 25% chance: No masking
         return x_using
-    if rand_number < 0.50:
-        # 25% chance: Mask the entire trajectory
-        return torch.zeros_like(x_using)
     else:
-        # 50% chance: Sequential masking
+        # 75% chance: Sequential masking / temporal masking
+        
+        # mask_rate = random.randrange(20, 70)/100 # 20-70% trajectory masking
+        
         mask = torch.ones(B, T, device=x.device)
         
         need_masked = int(round(mask_rate * T))
