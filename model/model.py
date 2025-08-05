@@ -398,7 +398,7 @@ class DanceDecoder(nn.Module):
         )
 
         # conditional projection
-        self.cond_projection = nn.Linear(latent_dim, latent_dim)
+        self.cond_projection = nn.Linear(seq_len * 2, seq_len)
             
         # cross modal encoder
         self.cond_encoder = nn.Sequential()
@@ -462,8 +462,8 @@ class DanceDecoder(nn.Module):
         keep_mask_embed  = rearrange(keep_mask, "b -> b 1 1")
         keep_mask_hidden = rearrange(keep_mask, "b -> b 1")
                 
-        cond_embed_music      = cond_embed["music"]
-        cond_embed_trajectory = cond_embed["trajectory"]
+        cond_embed_music      = cond_embed["music"]      # Shape: [B, 150, 4800]
+        cond_embed_trajectory = cond_embed["trajectory"] # Shape: [B, 150, 3]
         
         # trajectory encoding
         normalized_trajectory = self.trajectory_encoder.normalize(cond_embed_trajectory)                 # Shape: [B, 150, 3]
@@ -480,13 +480,15 @@ class DanceDecoder(nn.Module):
 
         # fuse music and trajectory tokens
         cond_tokens = torch.cat((music_tokens, trajectory_tokens), dim=1) # Shape: [B, 300, 512]
-        cond_tokens = self.cond_projection(cond_tokens)                   # Shape: [B, 150, 512]
+        cond_tokens = cond_tokens.permute(0, 2, 1)                        # Shape: [B, 512, 300]
+        cond_tokens = self.cond_projection(cond_tokens)                   # Shape: [B, 512, 150]
+        cond_tokens = cond_tokens.permute(0, 2, 1)                        # Shape: [B, 150, 512]
         cond_tokens = self.abs_pos_encoding(cond_tokens)                  # Shape: [B, 150, 512]
         cond_tokens = self.cond_encoder(cond_tokens)                      # Shape: [B, 150, 512]
         
         # guidance dropout
         null_cond_embed = self.null_cond_embed.to(cond_tokens.dtype)
-        cond_tokens     = torch.where(keep_mask_embed, cond_tokens, null_cond_embed)
+        cond_tokens     = torch.where(keep_mask_embed, cond_tokens, null_cond_embed) # Shape: [B, 150, 512]
 
         # Global conditioning for FiLM
         mean_pooled_cond_tokens = cond_tokens.mean(dim=1)                    # Shape: [B, 512]
@@ -501,15 +503,15 @@ class DanceDecoder(nn.Module):
 
         # FiLM conditioning: add global context to diffusion timestep
         null_cond_hidden = self.null_cond_hidden.to(t.dtype)
-        cond_hidden = torch.where(keep_mask_hidden, cond_hidden, null_cond_hidden)
-        t += cond_hidden
+        cond_hidden = torch.where(keep_mask_hidden, cond_hidden, null_cond_hidden) # Shape: [B, 512]
+        t += cond_hidden                                                           # Shape: [B, 512]
 
         # Prepare for cross-attention: concatenate all context sources
         c = torch.cat((cond_tokens, t_tokens), dim=1) # Shape: [B, 152, 512]
-        cond_tokens = self.norm_cond(c)
+        cond_tokens = self.norm_cond(c)               # Shape: [B, 152, 512]
 
         # Pass through the transformer decoder
-        output = self.seqTransDecoder(x, cond_tokens, t)
+        output = self.seqTransDecoder(x, cond_tokens, t) # Shape: [B, 150, 512]
 
-        output = self.final_layer(output)
+        output = self.final_layer(output) # Shape: [B, 150, 151]
         return output
