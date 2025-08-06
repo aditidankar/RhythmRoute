@@ -15,6 +15,7 @@ from data.slice import slice_audio
 from EDGE import EDGE
 from data.audio_extraction.baseline_features import extract as baseline_extract
 from data.audio_extraction.jukebox_features import extract as juke_extract
+import config
 
 # sort filenames that look like songname_slice{number}.ext
 key_func = lambda x: int(os.path.splitext(x)[0].split("_")[-1].split("slice")[-1])
@@ -103,7 +104,13 @@ def test(opt):
             all_cond.append(cond_list)
             all_filenames.append(file_list[rand_idx : rand_idx + sample_size])
 
-    model = EDGE(opt.feature_type, opt.checkpoint, is_training=False)
+    model = EDGE(
+        opt.feature_type,
+        opt.checkpoint,
+        is_training=False,
+        traj_mean_path=config.TRAJ_MEAN_PATH,
+        traj_std_path=config.TRAJ_STD_PATH,
+        )
     model.eval()
 
     # directory for optionally saving the dances for eval
