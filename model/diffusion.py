@@ -612,10 +612,10 @@ class GaussianDiffusion(nn.Module):
             sample_contact = None
         # do the FK all at once
         b, s, c = samples.shape
-        pos = samples[:, :, :3].to(cond.device)  # np.zeros((sample.shape[0], 3))
+        pos = samples[:, :, :3].to(cond["music"].device)  # np.zeros((sample.shape[0], 3))
         q = samples[:, :, 3:].reshape(b, s, 24, 6)
         # go 6d to ax
-        q = ax_from_6v(q).to(cond.device)
+        q = ax_from_6v(q).to(cond["music"].device)
 
         if mode == "long":
             b, s, c1, c2 = q.shape

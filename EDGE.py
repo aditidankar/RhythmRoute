@@ -76,7 +76,7 @@ class EDGE:
             music_feature_dim=music_feature_dim, # dimension of the conditioning features
             trajectory_feature_dim=3,            # dimension of the trajectory features
             mask_rate=0.25,                      # mask rate for the trajectory features
-            activation=F.gelu, # activation function
+            activation=F.gelu,                   # activation function
         )
 
         smpl = SMPLSkeleton(self.accelerator.device)
@@ -263,10 +263,11 @@ class EDGE:
                     print("Generating Sample")
                     # draw a music from the test dataset
                     (x, cond, filename, wavnames) = next(iter(test_data_loader))
-                    cond = cond.to(self.accelerator.device)
+                    for k, v in cond.items():
+                        cond[k] = v[:render_count].to(self.accelerator.device)
                     self.diffusion.render_sample(
                         shape,
-                        cond[:render_count],
+                        cond,
                         self.normalizer,
                         epoch,
                         os.path.join(opt.render_dir, "train_" + opt.exp_name),
@@ -281,14 +282,19 @@ class EDGE:
         self, data_tuple, label, render_dir, render_count=-1, fk_out=None, render=True
     ):
         _, cond, wavname = data_tuple
-        assert len(cond.shape) == 3
+        
+        assert len(cond["music"].shape) == 3
+        
         if render_count < 0:
-            render_count = len(cond)
+            render_count = len(cond["music"])
         shape = (render_count, self.horizon, self.repr_dim)
-        cond = cond.to(self.accelerator.device)
+        
+        for k, v in cond.items():
+            cond[k] = v[:render_count].to(self.accelerator.device)
+            
         self.diffusion.render_sample(
             shape,
-            cond[:render_count],
+            cond,
             self.normalizer,
             label,
             render_dir,
