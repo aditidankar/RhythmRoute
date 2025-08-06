@@ -46,6 +46,7 @@ class EDGE:
         self.accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
         state = AcceleratorState()
         num_processes = state.num_processes
+        self.rank = int(os.environ.get("RANK", 0))
         
         self.traj_mean_path = traj_mean_path
         self.traj_std_path = traj_std_path
@@ -233,11 +234,15 @@ class EDGE:
 
         self.accelerator.wait_for_everyone()
         for epoch in range(1, opt.epochs + 1):
+            
+            print(f"\n\n[Rank {self.rank}] Starting Epoch {epoch}", flush=True)
+            
             avg_loss = 0
             avg_vloss = 0
             avg_fkloss = 0
             avg_footloss = 0
             avg_trajectoryloss = 0
+            
             # train
             self.train()
             for step, (x, cond, filename, wavnames) in enumerate(
@@ -299,8 +304,8 @@ class EDGE:
                     print("Generating Sample")
                     # draw a music from the test dataset
                     (x, cond, filename, wavnames) = next(iter(test_data_loader))
-                    for k, v in cond.items():
-                        cond[k] = v[:render_count].to(self.accelerator.device)
+                    for modal, value in cond.items():
+                        cond[modal] = value[:render_count].to(self.accelerator.device)
                     self.diffusion.render_sample(
                         shape,
                         cond,
@@ -325,8 +330,11 @@ class EDGE:
             render_count = len(cond["music"])
         shape = (render_count, self.horizon, self.repr_dim)
         
-        for k, v in cond.items():
-            cond[k] = v[:render_count].to(self.accelerator.device)
+        for modal, value in cond.items():
+            if modal == "trajectory":
+                cond[modal] = value.to(self.accelerator.device)
+            else:
+                cond[modal] = value[:render_count].to(self.accelerator.device)
             
         self.diffusion.render_sample(
             shape,
