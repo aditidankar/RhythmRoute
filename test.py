@@ -106,7 +106,7 @@ def test(opt):
 
     model = EDGE(
         opt.feature_type,
-        opt.checkpoint,
+        checkpoint_path=opt.checkpoint,
         is_training=False,
         traj_mean_path=config.TRAJ_MEAN_PATH,
         traj_std_path=config.TRAJ_STD_PATH,
