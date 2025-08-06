@@ -23,6 +23,8 @@ data/train
 data/test
 data/dataset_backups
 data/dataset_backups_original
+data/jukebox_feats_rectified
+data/trajectories
 
 # Other data/cache folders
 train/
@@ -37,6 +39,7 @@ custom_music_one_song/
 dataset/dance_dataset1.py
 training_script.sh
 training_script_ck.sh
+training_script_short.sh
 test_script.sh
 vis1.py
 interactive_session.sh
