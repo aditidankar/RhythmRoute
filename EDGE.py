@@ -122,18 +122,23 @@ class EDGE:
             if is_training:
                 print("Loading raw model state from checkpoint")
                 weights_to_load = checkpoint["model_state_dict"]
+                self.model.load_state_dict(wrap(weights_to_load))
             # Otherwise (for inference), we load the EMA weights by default.
             else:
                 print("Loading EMA model state from checkpoint")
                 weights_to_load = checkpoint["ema_state_dict" if EMA else "model_state_dict"]
-            
-            self.model.load_state_dict(wrap(weights_to_load))
+                self.model.load_state_dict(maybe_wrap(weights_to_load, num_processes))
             print("Model weights loaded successfully")
             
             # Only load the optimizer state if we are resuming TRAINING.
             if is_training:
                 print("Loading optimizer state from checkpoint")
                 self.optim.load_state_dict(checkpoint["optimizer_state_dict"])
+            
+            # Load the EMA weights if we are resuming TRAINING.
+            if is_training and "ema_state_dict" in checkpoint:
+                print("Loading EMA state from checkpoint")
+                self.diffusion.ema.load_state_dict(checkpoint["ema_state_dict"])
 
     def eval(self):
         self.diffusion.eval()
