@@ -1,10 +1,15 @@
 from args import parse_train_opt
 from EDGE import EDGE
 import torch
+import config
 
 
 def train(opt):
-    model = EDGE(opt.feature_type)
+    model = EDGE(
+        opt.feature_type,
+        traj_mean_path=config.TRAJ_MEAN_PATH,
+        traj_std_path=config.TRAJ_STD_PATH,
+        )
     model.train_loop(opt)
 
 

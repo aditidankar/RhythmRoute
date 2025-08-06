@@ -114,7 +114,9 @@ class TrajectoryTransformerEncoder(nn.Module):
         model_dim=512, 
         num_heads=4, 
         num_layers=4, 
-        dropout=0.1
+        dropout=0.1,
+        traj_mean_path=None,
+        traj_std_path=None
         ):
         """        
         Args:
@@ -148,8 +150,8 @@ class TrajectoryTransformerEncoder(nn.Module):
         
         # Load the saved mean and std for normalization
         try:
-            mean = torch.load("./traj_mean.pt")
-            std = torch.load("./traj_std.pt")
+            mean = torch.load(traj_mean_path)
+            std = torch.load(traj_std_path)
         except FileNotFoundError:
             raise RuntimeError("Normalization files traj_mean.pt and traj_std.pt not found." 
                              "Please run the data processing once to generate them.")
@@ -323,6 +325,8 @@ class DanceDecoder(nn.Module):
         dropout: float = 0.1,
         music_feature_dim: int = 4800,
         trajectory_feature_dim: int = 3,
+        traj_mean_path: str = None,
+        traj_std_path: str = None,
         mask_rate: float = 0.25,
         activation: Callable[[Tensor], Tensor] = F.gelu,
         use_rotary=True,
@@ -394,7 +398,9 @@ class DanceDecoder(nn.Module):
             model_dim=latent_dim,
             num_heads=4,
             num_layers=4,
-            dropout=dropout
+            dropout=dropout,
+            traj_mean_path=traj_mean_path,
+            traj_std_path=traj_std_path
         )
 
         # conditional projection

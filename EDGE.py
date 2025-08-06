@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 import wandb
-from accelerate import Accelerator, DistributedDataParallelKwargs
+from accelerate import Accelerator, DistributedDataParallelKwargs, state
 from accelerate.state import AcceleratorState
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -24,8 +24,9 @@ def wrap(x):
     return {f"module.{key}": value for key, value in x.items()}
 
 
-def maybe_wrap(x, num):
-    return x if num == 1 else wrap(x)
+def maybe_wrap(x, num_processes):
+    # we only need to wrap the model if we are using DDP
+    return wrap(x) if num_processes > 1 else x
 
 
 class EDGE:
@@ -33,6 +34,8 @@ class EDGE:
         self,
         feature_type,
         checkpoint_path="",
+        traj_mean_path=None,
+        traj_std_path=None,
         # normalizer=None,
         EMA=True,
         learning_rate=4e-4,
@@ -42,6 +45,9 @@ class EDGE:
         self.accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
         state = AcceleratorState()
         num_processes = state.num_processes
+        
+        self.traj_mean_path = traj_mean_path
+        self.traj_std_path = traj_std_path
         
         use_baseline_feats = feature_type == "baseline"
 
@@ -77,6 +83,8 @@ class EDGE:
             trajectory_feature_dim=3,            # dimension of the trajectory features
             mask_rate=0.25,                      # mask rate for the trajectory features
             activation=F.gelu,                   # activation function
+            traj_mean_path=traj_mean_path,
+            traj_std_path=traj_std_path,
         )
 
         smpl = SMPLSkeleton(self.accelerator.device)
@@ -143,6 +151,8 @@ class EDGE:
                 backup_path=opt.processed_data_dir,
                 train=True,
                 force_reload=opt.force_reload,
+                traj_mean_path=self.traj_mean_path,
+                traj_std_path=self.traj_mean_path,
             )
             test_dataset = AISTPPDataset(
                 data_path=opt.data_path,
@@ -150,6 +160,8 @@ class EDGE:
                 train=False,
                 normalizer=train_dataset.normalizer,
                 force_reload=opt.force_reload,
+                traj_mean_path=self.traj_mean_path,
+                traj_std_path=self.traj_mean_path,
             )
             # cache the dataset in case
             if self.accelerator.is_main_process:

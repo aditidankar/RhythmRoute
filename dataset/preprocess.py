@@ -56,22 +56,26 @@ def vectorize_many(data):
 
 # # This class is used to normalize trajectories in the dataset.
 class ZNormalizer:
-    def __init__(self, data, save=False):
+    def __init__(self, data, mean_path, std_path, save=False):
+        self.mean_path = mean_path
+        self.std_path = std_path
         if save:
-            traj_std, traj_mean  = torch.std_mean(data, dim=0)
-            torch.save(traj_std,  "./traj_std.pt")
-            torch.save(traj_mean, "./traj_mean.pt")
-        
+            if not os.path.exists(self.mean_path) or not os.path.exists(self.std_path):
+                print(f"Saving trajectory mean and std to {self.mean_path} and {self.std_path}")
+                traj_std, traj_mean  = torch.std_mean(data, dim=0)
+                torch.save(traj_mean, self.mean_path)
+                torch.save(traj_std, self.std_path)
+
     def normalize(self, data):
         # Normalize trajectory
         # Load precomputed train std and mean
-        traj_std = torch.load( "./traj_std.pt").to(data.device)
-        traj_mean = torch.load( "./traj_mean.pt").to(data.device)
+        traj_std = torch.load(self.std_path).to(data.device)
+        traj_mean = torch.load(self.mean_path).to(data.device)
         return (data - traj_mean) / traj_std
     
     def unnormalize(self, data):
         # Inverse normalize trajectory
         # Load precomputed train std and mean
-        traj_std = torch.load( "./traj_std.pt").to(data.device)
-        traj_mean = torch.load( "./traj_mean.pt").to(data.device)
+        traj_std = torch.load(self.std_path).to(data.device)
+        traj_mean = torch.load(self.mean_path).to(data.device)
         return data * traj_std + traj_mean
