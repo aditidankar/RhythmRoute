@@ -150,6 +150,11 @@ class EDGE:
         return self.accelerator.prepare(*objects)
 
     def train_loop(self, opt):
+        for k, v in vars(opt).items():
+            config = {k: v for k, v in vars(opt).items()}
+        config["learning_rate"] = self.optim.defaults["lr"]
+        config["weight_decay"] = self.optim.defaults["weight_decay"]
+        
         # load datasets
         train_tensor_dataset_path = os.path.join(
             opt.processed_data_dir, f"train_tensor_dataset.pkl"
@@ -221,7 +226,7 @@ class EDGE:
         if self.accelerator.is_main_process:
             save_dir = str(increment_path(Path(opt.project) / opt.exp_name))
             opt.exp_name = save_dir.split("/")[-1]
-            wandb.init(project=opt.wandb_pj_name, name=opt.exp_name)
+            wandb.init(project=opt.wandb_pj_name, name=opt.exp_name, config=config)
             save_dir = Path(save_dir)
             wdir = save_dir / "weights"
             wdir.mkdir(parents=True, exist_ok=True)
