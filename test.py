@@ -103,7 +103,7 @@ def test(opt):
             all_cond.append(cond_list)
             all_filenames.append(file_list[rand_idx : rand_idx + sample_size])
 
-    model = EDGE(opt.feature_type, opt.checkpoint)
+    model = EDGE(opt.feature_type, opt.checkpoint, is_training=False)
     model.eval()
 
     # directory for optionally saving the dances for eval

@@ -34,6 +34,7 @@ class EDGE:
         self,
         feature_type,
         checkpoint_path="",
+        is_training=False,
         traj_mean_path=None,
         traj_std_path=None,
         # normalizer=None,
@@ -66,9 +67,12 @@ class EDGE:
         self.normalizer = None
         checkpoint = None
         if checkpoint_path != "":
+            print(f"Loading checkpoint from {checkpoint_path}")
             checkpoint = torch.load(
                 checkpoint_path, map_location=self.accelerator.device
             )
+            print("Checkpoint loaded successfully")
+            print("Loading normalizer from checkpoint")
             self.normalizer = checkpoint["normalizer"]
 
         model = DanceDecoder(
@@ -112,14 +116,24 @@ class EDGE:
         optim = Adan(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         self.optim = self.accelerator.prepare(optim)
 
-        if checkpoint_path != "":
-            self.model.load_state_dict(
-                maybe_wrap(
-                    checkpoint["ema_state_dict" if EMA else "model_state_dict"],
-                    num_processes,
-                )
-            )
-            self.optim.load_state_dict(checkpoint["optimizer_state_dict"]) # load optimizer state 
+        if checkpoint is not None:
+            print("Loading model weights from checkpoint")
+            # If we are resuming TRAINING, we MUST load the raw model state.
+            if is_training:
+                print("Loading raw model state from checkpoint")
+                weights_to_load = checkpoint["model_state_dict"]
+            # Otherwise (for inference), we load the EMA weights by default.
+            else:
+                print("Loading EMA model state from checkpoint")
+                weights_to_load = checkpoint["ema_state_dict" if EMA else "model_state_dict"]
+            
+            self.model.load_state_dict(wrap(weights_to_load))
+            print("Model weights loaded successfully")
+            
+            # Only load the optimizer state if we are resuming TRAINING.
+            if is_training:
+                print("Loading optimizer state from checkpoint")
+                self.optim.load_state_dict(checkpoint["optimizer_state_dict"])
 
     def eval(self):
         self.diffusion.eval()

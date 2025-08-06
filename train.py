@@ -7,6 +7,8 @@ import config
 def train(opt):
     model = EDGE(
         opt.feature_type,
+        checkpoint_path=opt.checkpoint,
+        is_training=True,
         traj_mean_path=config.TRAJ_MEAN_PATH,
         traj_std_path=config.TRAJ_STD_PATH,
         )
