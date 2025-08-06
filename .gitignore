@@ -36,7 +36,7 @@ custom_music_one_song/
 # =================================
 dataset/dance_dataset1.py
 training_script.sh
-training_script1.sh
+training_script_ck.sh
 vis1.py
 interactive_session.sh
 visualize_path.ipynb
