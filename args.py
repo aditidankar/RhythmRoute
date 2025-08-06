@@ -95,5 +95,11 @@ def parse_test_opt():
         default="cached_features/",
         help="Where to save/load the features",
     )
+    parser.add_argument(
+        "--trajectory_dir",
+        type=str,
+        default="data/trajectories/",
+        help="folder containing trajectory data",
+    )
     opt = parser.parse_args()
     return opt
