@@ -51,22 +51,49 @@ def test(opt):
         # iterate through each slice directory and load all features
         slice_dirs = sorted(glob.glob(os.path.join(opt.feature_cache_dir, "*/")))
         for slice_dir in tqdm(slice_dirs, desc="Processing slices"):
-            wav_list  = sorted(glob.glob(f"{slice_dir}/*.wav"), key=stringintkey)
-            feat_list = sorted(glob.glob(f"{slice_dir}/*.npy"), key=stringintkey)
+            file_list  = sorted(glob.glob(f"{slice_dir}/*.wav"), key=stringintkey)
+            juke_file_list = sorted(glob.glob(f"{slice_dir}/*.npy"), key=stringintkey)
             # Sanity check to ensure the number of audio files matches the number of feature files
-            if len(wav_list) != len(feat_list):
+            if len(file_list) != len(juke_file_list):
                 print(f"Warning: Mismatch in number of audio files and feature files in {slice_dir}")
                 continue
             # Load features
-            cond_list = [np.load(f) for f in feat_list]
-            all_filenames.append(wav_list)
-            all_cond.append(torch.from_numpy(np.array(cond_list)))
+            juke_list = [np.load(f) for f in juke_file_list]
+            juke_cond = torch.from_numpy(np.array(juke_list))
+            num_slices = len(juke_list)
+            
+            # Load trajectory
+            traj_filename = os.path.join(opt.trajectory_dir, os.path.basename(slice_dir.strip('/')) + ".npy")
+            if not os.path.exists(traj_filename):
+                print(f"Warning: Trajectory file not found for {slice_dir}, skipping...")
+                continue
+            
+            # Unsqueeze and repeat the trajectory for each slice
+            trajectory_data = torch.from_numpy(np.load(traj_filename)).float()  # Ensure correct dtype
+            trajectory_cond = trajectory_data.unsqueeze(0).repeat(num_slices, 1, 1)
+            
+            cond_list = {
+                "music": juke_cond,
+                "trajectory": trajectory_cond,
+            }
+            
+            all_filenames.append(file_list)
+            all_cond.append(cond_list)
     else:
         print("Computing features for input music")
         for wav_file in glob.glob(os.path.join(opt.music_dir, "*.wav")):
+            songname = os.path.splitext(os.path.basename(wav_file))[0]
+            
+            # Load corresponding trajectory for the song
+            traj_filename = os.path.join(opt.trajectory_dir, songname + ".npy")
+            if not os.path.exists(traj_filename):
+                print(f"Warning: Trajectory file not found for {wav_file}, skipping...")
+                continue
+            
+            trajectory_data = torch.from_numpy(np.load(traj_filename)).float()
+
             # create temp folder (or use the cache folder if specified)
             if opt.cache_features:
-                songname = os.path.splitext(os.path.basename(wav_file))[0]
                 save_dir = os.path.join(opt.feature_cache_dir, songname)
                 Path(save_dir).mkdir(parents=True, exist_ok=True)
                 dirname = save_dir
@@ -74,35 +101,48 @@ def test(opt):
                 temp_dir = TemporaryDirectory()
                 temp_dir_list.append(temp_dir)
                 dirname = temp_dir.name
+
             # slice the audio file
             print(f"Slicing {wav_file}")
             slice_audio(wav_file, 2.5, 5.0, dirname)
             file_list = sorted(glob.glob(f"{dirname}/*.wav"), key=stringintkey)
+
             # randomly sample a chunk of length at most sample_size
-            rand_idx = random.randint(0, len(file_list) - sample_size)
-            cond_list = []
+            if len(file_list) < sample_size:
+                rand_idx = 0
+                num_slices_to_use = len(file_list)
+            else:
+                rand_idx = random.randint(0, len(file_list) - sample_size)
+                num_slices_to_use = sample_size
+            
+            files_to_use = file_list[rand_idx : rand_idx + num_slices_to_use]
+            music_cond_list = []
+            
             # generate juke representations
-            print(f"Computing features for {wav_file}")
-            for idx, file in enumerate(tqdm(file_list)):
-                # if not caching then only calculate for the interested range
-                if (not opt.cache_features) and (not (rand_idx <= idx < rand_idx + sample_size)):
-                    continue
-                # audio = jukemirlib.load_audio(file)
-                # reps = jukemirlib.extract(
-                #     audio, layers=[66], downsample_target_rate=30
-                # )[66]
+            print(f"Computing features for {len(files_to_use)} slices of {wav_file}")
+            for file in tqdm(files_to_use):
                 reps, _ = feature_func(file)
                 # save reps
                 if opt.cache_features:
                     featurename = os.path.splitext(file)[0] + ".npy"
                     np.save(featurename, reps)
-                # if in the random range, put it into the list of reps we want
-                # to actually use for generation
-                if rand_idx <= idx < rand_idx + sample_size:
-                    cond_list.append(reps)
-            cond_list = torch.from_numpy(np.array(cond_list))
-            all_cond.append(cond_list)
-            all_filenames.append(file_list[rand_idx : rand_idx + sample_size])
+                music_cond_list.append(reps)
+            
+            if not music_cond_list:
+                continue
+
+            juke_cond = torch.from_numpy(np.array(music_cond_list))
+            
+            # Unsqueeze and repeat the trajectory for each slice
+            trajectory_cond = trajectory_data.unsqueeze(0).repeat(juke_cond.shape[0], 1, 1)
+            
+            final_cond = {
+                "music": juke_cond,
+                "trajectory": trajectory_cond,
+            }
+
+            all_cond.append(final_cond)
+            all_filenames.append(files_to_use)
 
     model = EDGE(
         opt.feature_type,
