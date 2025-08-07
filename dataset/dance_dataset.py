@@ -35,8 +35,6 @@ class AISTPPDataset(Dataset):
         data_len: int = -1,
         include_contacts: bool = True,
         force_reload: bool = False,
-        traj_mean_path: str = None,
-        traj_std_path: str = None,
     ):
         self.data_path = data_path
         self.raw_fps = 60
@@ -51,8 +49,6 @@ class AISTPPDataset(Dataset):
         self.normalizer = normalizer
         self.data_len = data_len
         
-        self.traj_mean_path = traj_mean_path
-        self.traj_std_path = traj_std_path
 
         pickle_name = "processed_train_data.pkl" if train else "processed_test_data.pkl"
 
@@ -215,12 +211,10 @@ class AISTPPDataset(Dataset):
 
         print(f"{data_name} Dataset Motion Features Dim: {global_pose_vec_input.shape}")
         
-        # Normalize root trajectory and save std and mean as pt files (run once)
-        if self.train:
-             traj_normalizer = ZNormalizer(root_pos, self.traj_mean_path, self.traj_std_path, save=True) # save=True to save std and mean
-             root_pos = traj_normalizer.normalize(root_pos)
+        # extract root position for trajectory from global_pose_vec_input
+        normalized_root_pos = global_pose_vec_input[:, :, 4:7]  # shape: [B, seq, 3]
         
-        return global_pose_vec_input, root_pos # Added root_pos: ADITI
+        return global_pose_vec_input, normalized_root_pos # Added normalized_root_pos
 
 
 class OrderedMusicDataset(Dataset):

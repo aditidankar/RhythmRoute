@@ -115,8 +115,6 @@ class TrajectoryTransformerEncoder(nn.Module):
         num_heads=4, 
         num_layers=4, 
         dropout=0.1,
-        traj_mean_path=None,
-        traj_std_path=None
         ):
         """        
         Args:
@@ -147,18 +145,6 @@ class TrajectoryTransformerEncoder(nn.Module):
             encoder_layer=encoder_layers,
             num_layers=num_layers
         )
-        
-        # Load the saved mean and std for normalization
-        try:
-            mean = torch.load(traj_mean_path)
-            std = torch.load(traj_std_path)
-        except FileNotFoundError:
-            raise RuntimeError("Normalization files traj_mean.pt and traj_std.pt not found." 
-                             "Please run the data processing once to generate them.")
-        
-        # Register as buffers to ensure they are moved to the correct device
-        self.register_buffer("mean", mean)
-        self.register_buffer("std", std)
             
     def forward(self, x):
         # x: [B, 150, 3]
@@ -168,19 +154,6 @@ class TrajectoryTransformerEncoder(nn.Module):
         x = self.pos_encoder(x) # Shape: [B, 150, 512]
         trajectory_features = self.transformer_encoder(x) # Shape: [B, 150, 512]
         return trajectory_features
-    
-    def normalize(self, x):
-        """
-        Normalizes the trajectory data.
-        """
-        return (x - self.mean) / self.std
-        
-    def unnormalize(self, x):
-        """
-        Denormalizes the trajectory data. This can be useful for visualization or evaluation.
-        Assumes x is in the normalized format.
-        """
-        return x * self.std + self.mean
 
 
 class FiLMTransformerDecoderLayer(nn.Module):
@@ -325,8 +298,6 @@ class DanceDecoder(nn.Module):
         dropout: float = 0.1,
         music_feature_dim: int = 4800,
         trajectory_feature_dim: int = 3,
-        traj_mean_path: str = None,
-        traj_std_path: str = None,
         mask_rate: float = 0.25,
         activation: Callable[[Tensor], Tensor] = F.gelu,
         use_rotary=True,
@@ -338,6 +309,7 @@ class DanceDecoder(nn.Module):
         output_feats = nfeats
         self.mask_rate = mask_rate
         self.gt_trajectory_tokens = None
+        self.trajectory_output = None
 
         # positional embeddings
         self.rotary = None
@@ -399,8 +371,6 @@ class DanceDecoder(nn.Module):
             num_heads=4,
             num_layers=4,
             dropout=dropout,
-            traj_mean_path=traj_mean_path,
-            traj_std_path=traj_std_path
         )
 
         # conditional projection
@@ -472,12 +442,8 @@ class DanceDecoder(nn.Module):
         cond_embed_trajectory = cond_embed["trajectory"] # Shape: [B, 150, 3]
         
         # trajectory encoding
-        normalized_trajectory = self.trajectory_encoder.normalize(cond_embed_trajectory)                 # Shape: [B, 150, 3]
-        masked_trajectory     = root_trajectory_masking(normalized_trajectory, mask_rate=self.mask_rate) # Shape: [B, 150, 3]
+        masked_trajectory     = root_trajectory_masking(cond_embed_trajectory, mask_rate=self.mask_rate) # Shape: [B, 150, 3]
         trajectory_tokens     = self.trajectory_encoder(masked_trajectory)                               # Shape: [B, 150, 512]
-
-        # store the ground truth trajectory tokens for loss calculation
-        self.gt_trajectory_tokens = self.trajectory_encoder(normalized_trajectory).detach()
 
         # music encoding
         music_tokens = self.music_projection(cond_embed_music) # Shape: [B, 150, 512]
@@ -520,4 +486,12 @@ class DanceDecoder(nn.Module):
         output = self.seqTransDecoder(x, cond_tokens, t) # Shape: [B, 150, 512]
 
         output = self.final_layer(output) # Shape: [B, 150, 151]
+        
+        # store the ground truth trajectory tokens for loss calculation
+        self.gt_trajectory_tokens = self.trajectory_encoder(cond_embed_trajectory).detach()
+        
+        # Extract the trajectory output
+        self.trajectory_output = output[:, :, 4:7]                                # Shape: [B, 150, 3]
+        self.trajectory_output = self.trajectory_encoder(self.trajectory_output)  # Shape: [B, 150, 512]
+        
         return output

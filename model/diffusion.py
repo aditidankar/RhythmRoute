@@ -477,10 +477,8 @@ class GaussianDiffusion(nn.Module):
         loss = loss * extract(self.p2_loss_weight, t, loss.shape)
         
         # trajectory loss
-        predicted_unnormalized_trajectory = self.normalizer.unnormalize(x_recon)[:, :, 4:7]
-        predicted_normalized_trajectory = self.model.trajectory_encoder.normalize(predicted_unnormalized_trajectory)
-        predicted_trajectory_tokens = self.model.trajectory_encoder(predicted_normalized_trajectory)
-        target_trajectory_tokens = self.model.gt_trajectory_tokens
+        predicted_trajectory_tokens = self.model.trajectory_output
+        target_trajectory_tokens    = self.model.gt_trajectory_tokens
         trajectory_loss = self.loss_fn(predicted_trajectory_tokens, target_trajectory_tokens, reduction="none")
         trajectory_loss = reduce(trajectory_loss, "b ... -> b (...)", "mean")
         trajectory_loss = trajectory_loss * extract(self.p2_loss_weight, t, trajectory_loss.shape)
