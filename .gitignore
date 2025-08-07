@@ -25,6 +25,8 @@ data/dataset_backups
 data/dataset_backups_original
 data/jukebox_feats_rectified
 data/trajectories
+data/trajectories_per_slice
+generate_test_trajectory/old_trajectory_generation_logic
 
 # Other data/cache folders
 train/
@@ -42,10 +44,12 @@ training_script_ck.sh
 training_script_short.sh
 test_script.sh
 vis1.py
+test1.py
 interactive_session.sh
 visualize_path.ipynb
 dataset/preprocess1.py
 dataset/scaler1.py
+media/test_traj_motions.png
 
 # Media files
 *.gif
