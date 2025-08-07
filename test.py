@@ -15,7 +15,6 @@ from data.slice import slice_audio
 from EDGE import EDGE
 from data.audio_extraction.baseline_features import extract as baseline_extract
 from data.audio_extraction.jukebox_features import extract as juke_extract
-import config
 
 # sort filenames that look like songname_slice{number}.ext
 key_func = lambda x: int(os.path.splitext(x)[0].split("_")[-1].split("slice")[-1])
@@ -62,15 +61,19 @@ def test(opt):
             juke_cond = torch.from_numpy(np.array(juke_list))
             num_slices = len(juke_list)
             
-            # Load trajectory
-            traj_filename = os.path.join(opt.trajectory_dir, os.path.basename(slice_dir.strip('/')) + ".npy")
-            if not os.path.exists(traj_filename):
-                print(f"Warning: Trajectory file not found for {slice_dir}, skipping...")
+            traj_filename = os.path.join(opt.trajectory_dir, os.path.basename(slice_dir.strip('/')), os.path.basename(juke_file_list[0]).replace(".npy", ".npy"))
+            # Correctly form the trajectory file path for each slice
+            traj_files = [os.path.join(opt.trajectory_dir, os.path.basename(slice_dir.strip('/')), os.path.basename(f)) for f in juke_file_list]
+
+            # Check if all trajectory files exist
+            if not all(os.path.exists(f) for f in traj_files):
+                print(f"Warning: Not all trajectory files found for slices in {slice_dir}, skipping...")
                 continue
             
-            # Unsqueeze and repeat the trajectory for each slice
-            trajectory_data = torch.from_numpy(np.load(traj_filename)).float()  # Ensure correct dtype
-            trajectory_cond = trajectory_data.unsqueeze(0).repeat(num_slices, 1, 1)
+            # Load all corresponding trajectory slices
+            trajectory_list = [torch.from_numpy(np.load(f)).float() for f in traj_files]
+            trajectory_cond = torch.stack(trajectory_list, dim=0)
+
             
             cond_list = {
                 "music": juke_cond,
@@ -133,8 +136,27 @@ def test(opt):
 
             juke_cond = torch.from_numpy(np.array(music_cond_list))
             
-            # Unsqueeze and repeat the trajectory for each slice
-            trajectory_cond = trajectory_data.unsqueeze(0).repeat(juke_cond.shape[0], 1, 1)
+            # Load corresponding trajectory slices for the selected audio slices
+            trajectory_cond_list = []
+            for file in files_to_use:
+                slice_basename = os.path.basename(file)
+                # This assumes the sliced trajectories are in a flat directory for non-cached mode,
+                # or you have a known mapping. Let's assume a flat directory for simplicity here.
+                # e.g. trajectories_sliced/gWA_sBM_cAll_d26_mWA0_ch02_slice9.npy
+                traj_filename = os.path.join(opt.trajectory_dir, slice_basename.replace('.wav', '.npy'))
+
+                if not os.path.exists(traj_filename):
+                    print(f"Warning: Trajectory slice file not found for {file}, skipping this slice...")
+                    continue
+                
+                trajectory_data = torch.from_numpy(np.load(traj_filename)).float()
+                trajectory_cond_list.append(trajectory_data)
+
+            if not trajectory_cond_list:
+                continue
+
+            trajectory_cond = torch.stack(trajectory_cond_list, dim=0)
+
             
             final_cond = {
                 "music": juke_cond,
@@ -148,8 +170,6 @@ def test(opt):
         opt.feature_type,
         checkpoint_path=opt.checkpoint,
         is_training=False,
-        traj_mean_path=config.TRAJ_MEAN_PATH,
-        traj_std_path=config.TRAJ_STD_PATH,
         )
     model.eval()
 
