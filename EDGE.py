@@ -37,7 +37,6 @@ class EDGE:
         is_training=False,
         traj_mean_path=None,
         traj_std_path=None,
-        # normalizer=None,
         EMA=True,
         learning_rate=4e-4,
         weight_decay=0.02,
@@ -90,6 +89,7 @@ class EDGE:
             activation=F.gelu,                   # activation function
             traj_mean_path=traj_mean_path,
             traj_std_path=traj_std_path,
+            normalizer=self.normalizer,
         )
 
         smpl = SMPLSkeleton(self.accelerator.device)
@@ -177,7 +177,7 @@ class EDGE:
                 train=True,
                 force_reload=opt.force_reload,
                 traj_mean_path=self.traj_mean_path,
-                traj_std_path=self.traj_mean_path,
+                traj_std_path=self.traj_std_path,
             )
             test_dataset = AISTPPDataset(
                 data_path=opt.data_path,
@@ -186,7 +186,7 @@ class EDGE:
                 normalizer=train_dataset.normalizer,
                 force_reload=opt.force_reload,
                 traj_mean_path=self.traj_mean_path,
-                traj_std_path=self.traj_mean_path,
+                traj_std_path=self.traj_std_path,
             )
             # cache the dataset in case
             if self.accelerator.is_main_process:
@@ -195,6 +195,7 @@ class EDGE:
 
         # set normalizer
         self.normalizer = test_dataset.normalizer
+        self.model.normalizer = self.normalizer
         self.diffusion.normalizer = self.normalizer
 
         # data loaders
