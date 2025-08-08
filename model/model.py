@@ -327,6 +327,7 @@ class DanceDecoder(nn.Module):
         trajectory_feature_dim: int = 3,
         traj_mean_path: str = None,
         traj_std_path: str = None,
+        normalizer: Any = None,
         mask_rate: float = 0.25,
         activation: Callable[[Tensor], Tensor] = F.gelu,
         use_rotary=True,
@@ -337,7 +338,10 @@ class DanceDecoder(nn.Module):
 
         output_feats = nfeats
         self.mask_rate = mask_rate
+        self.normalizer = normalizer
+        
         self.gt_trajectory_tokens = None
+        self.trajectory_output = None
 
         # positional embeddings
         self.rotary = None
@@ -472,12 +476,8 @@ class DanceDecoder(nn.Module):
         cond_embed_trajectory = cond_embed["trajectory"] # Shape: [B, 150, 3]
         
         # trajectory encoding
-        normalized_trajectory = self.trajectory_encoder.normalize(cond_embed_trajectory)                 # Shape: [B, 150, 3]
-        masked_trajectory     = root_trajectory_masking(normalized_trajectory, mask_rate=self.mask_rate) # Shape: [B, 150, 3]
+        masked_trajectory     = root_trajectory_masking(cond_embed_trajectory, mask_rate=self.mask_rate) # Shape: [B, 150, 3]
         trajectory_tokens     = self.trajectory_encoder(masked_trajectory)                               # Shape: [B, 150, 512]
-
-        # store the ground truth trajectory tokens for loss calculation
-        self.gt_trajectory_tokens = self.trajectory_encoder(normalized_trajectory).detach()
 
         # music encoding
         music_tokens = self.music_projection(cond_embed_music) # Shape: [B, 150, 512]
@@ -520,4 +520,13 @@ class DanceDecoder(nn.Module):
         output = self.seqTransDecoder(x, cond_tokens, t) # Shape: [B, 150, 512]
 
         output = self.final_layer(output) # Shape: [B, 150, 151]
+        
+        # store the ground truth trajectory tokens for loss calculation
+        self.gt_trajectory_tokens = self.trajectory_encoder(cond_embed_trajectory).detach()
+        
+        self.trajectory_output = output[:, :, 4:7]
+        self.trajectory_output = self.normalizer.unnormalize(self.trajectory_output)
+        self.trajectory_output = self.trajectory_encoder.normalize(self.trajectory_output)
+        self.trajectory_output = self.trajectory_encoder(self.trajectory_output)
+        
         return output
