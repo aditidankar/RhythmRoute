@@ -112,10 +112,10 @@ class EDGE:
             "Model has {} parameters".format(sum(y.numel() for y in model.parameters()))
         )
 
-        self.model = self.accelerator.prepare(model)
-        self.diffusion = diffusion.to(self.accelerator.device)
         optim = Adan(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        self.optim = self.accelerator.prepare(optim)
+        self.model, self.optim = self.accelerator.prepare(model, optim)
+        self.diffusion = diffusion.to(self.accelerator.device)
+        self.diffusion.model = self.model
 
         if checkpoint is not None:
             print("Loading model weights from checkpoint")
@@ -195,7 +195,7 @@ class EDGE:
 
         # set normalizer
         self.normalizer = test_dataset.normalizer
-        self.model.normalizer = self.normalizer
+        self.diffusion.model.normalizer = self.normalizer
         self.diffusion.normalizer = self.normalizer
 
         # data loaders
@@ -205,7 +205,7 @@ class EDGE:
             train_dataset,
             batch_size=opt.batch_size,
             shuffle=True,
-            num_workers=min(int(num_cpus * 0.75), 8), # 32
+            num_workers=8, # min(int(num_cpus * 0.75), 8), # 32
             pin_memory=True,
             drop_last=True,
         )
