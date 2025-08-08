@@ -35,6 +35,9 @@ class EDGE:
         feature_type,
         checkpoint_path="",
         is_training=False,
+        traj_mean_path=None,
+        traj_std_path=None,
+        # normalizer=None,
         EMA=True,
         learning_rate=4e-4,
         weight_decay=0.02,
@@ -44,6 +47,9 @@ class EDGE:
         state = AcceleratorState()
         num_processes = state.num_processes
         self.rank = int(os.environ.get("RANK", 0))
+        
+        self.traj_mean_path = traj_mean_path
+        self.traj_std_path = traj_std_path
         
         use_baseline_feats = feature_type == "baseline"
 
@@ -82,6 +88,8 @@ class EDGE:
             trajectory_feature_dim=3,            # dimension of the trajectory features
             mask_rate=0.25,                      # mask rate for the trajectory features
             activation=F.gelu,                   # activation function
+            traj_mean_path=traj_mean_path,
+            traj_std_path=traj_std_path,
         )
 
         smpl = SMPLSkeleton(self.accelerator.device)
@@ -168,6 +176,8 @@ class EDGE:
                 backup_path=opt.processed_data_dir,
                 train=True,
                 force_reload=opt.force_reload,
+                traj_mean_path=self.traj_mean_path,
+                traj_std_path=self.traj_mean_path,
             )
             test_dataset = AISTPPDataset(
                 data_path=opt.data_path,
@@ -175,6 +185,8 @@ class EDGE:
                 train=False,
                 normalizer=train_dataset.normalizer,
                 force_reload=opt.force_reload,
+                traj_mean_path=self.traj_mean_path,
+                traj_std_path=self.traj_mean_path,
             )
             # cache the dataset in case
             if self.accelerator.is_main_process:
