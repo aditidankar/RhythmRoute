@@ -58,38 +58,45 @@ class AISTPPDataset(Dataset):
 
         backup_path = Path(backup_path)
         backup_path.mkdir(parents=True, exist_ok=True)
+        
         # save normalizer
         if not train:
             pickle.dump(
                 normalizer, open(os.path.join(backup_path, "normalizer.pkl"), "wb")
             )
+        
         # load raw data
         if not force_reload and pickle_name in os.listdir(backup_path):
             print("Using cached dataset...")
             with open(os.path.join(backup_path, pickle_name), "rb") as f:
-                data = pickle.load(f)
+                self.data = pickle.load(f)
         else:
-            print("Loading dataset...")
+            print("Loading and processing dataset...")
             data = self.load_aistpp()  # Call this last
+            print(
+                f"Loaded {self.name} raw dataset with dimensions: Pos: {data['pos'].shape}, Q: {data['q'].shape}"
+            )
+            # process data, convert to 6dof etc
+            pose_input, root_trajectories = self.process_dataset(
+                data["pos"], data["q"]
+            )  # Added root_trajectories
+
+            self.data = {
+                "pose": pose_input,
+                "root_trajectory": root_trajectories,
+                "filenames": data["filenames"],
+                "wavs": data["wavs"],
+            }
             with open(os.path.join(backup_path, pickle_name), "wb") as f:
-                pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.data, f, pickle.HIGHEST_PROTOCOL)
 
         print(
-            f"Loaded {self.name} Dataset With Dimensions: Pos: {data['pos'].shape}, Q: {data['q'].shape}"
+            f"Using {self.name} Dataset With Dimensions: Pose: {self.data['pose'].shape}, Trajectory: {self.data['root_trajectory'].shape}"
         )
 
-        # process data, convert to 6dof etc
-        # pose_input = self.process_dataset(data["pos"], data["q"])
-        pose_input, root_trajectories = self.process_dataset(data["pos"], data["q"]) # Added root_trajectories: ADITI
-        
-        self.data = {
-            "pose": pose_input,
-            "root_trajectory": root_trajectories, # Added: ADITI
-            "filenames": data["filenames"],
-            "wavs": data["wavs"],
-        }
-        assert len(pose_input) == len(data["filenames"])
-        self.length = len(pose_input)
+        assert len(self.data["pose"]) == len(self.data["filenames"])
+        self.length = len(self.data["pose"])
+        breakpoint()
 
     def __len__(self):
         return self.length
@@ -216,11 +223,10 @@ class AISTPPDataset(Dataset):
         print(f"{data_name} Dataset Motion Features Dim: {global_pose_vec_input.shape}")
         
         # Normalize root trajectory and save std and mean as pt files (run once)
-        if self.train:
-             traj_normalizer = ZNormalizer(root_pos, self.traj_mean_path, self.traj_std_path, save=True) # save=True to save std and mean
-             root_pos = traj_normalizer.normalize(root_pos)
+        traj_normalizer = ZNormalizer(root_pos, self.traj_mean_path, self.traj_std_path, save=self.train)
+        normalized_root_pos = traj_normalizer.normalize(root_pos)
         
-        return global_pose_vec_input, root_pos # Added root_pos: ADITI
+        return global_pose_vec_input, normalized_root_pos # Added root_pos
 
 
 class OrderedMusicDataset(Dataset):
