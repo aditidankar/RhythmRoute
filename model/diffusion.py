@@ -462,9 +462,11 @@ class GaussianDiffusion(nn.Module):
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
         # reconstruct
-        x_recon = self.model(x_noisy, cond, t, cond_drop_prob=self.cond_drop_prob)
+        x_recon, predicted_trajectory_tokens, target_trajectory_tokens = self.model(
+            x_noisy, cond, t, cond_drop_prob=self.cond_drop_prob
+        )
         assert noise.shape == x_recon.shape
-
+        
         model_out = x_recon
         if self.predict_epsilon:
             target = noise
@@ -477,8 +479,6 @@ class GaussianDiffusion(nn.Module):
         loss = loss * extract(self.p2_loss_weight, t, loss.shape)
         
         # trajectory loss
-        predicted_trajectory_tokens = self.model.trajectory_output
-        target_trajectory_tokens = self.model.gt_trajectory_tokens
         trajectory_loss = self.loss_fn(predicted_trajectory_tokens, target_trajectory_tokens, reduction="none")
         trajectory_loss = reduce(trajectory_loss, "b ... -> b (...)", "mean")
         trajectory_loss = trajectory_loss * extract(self.p2_loss_weight, t, trajectory_loss.shape)
