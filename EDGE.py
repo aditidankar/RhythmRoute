@@ -106,7 +106,9 @@ class EDGE:
 
         self.model = self.accelerator.prepare(model)
         self.diffusion = diffusion.to(self.accelerator.device)
-        optim = Adan(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        self.diffusion.model = self.model  # Update diffusion to use the wrapped model
+
+        optim = Adan(self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         self.optim = self.accelerator.prepare(optim)
 
         if checkpoint is not None:
@@ -131,7 +133,7 @@ class EDGE:
             # Load the EMA weights if we are resuming TRAINING.
             if is_training and "ema_state_dict" in checkpoint:
                 print("Loading EMA state from checkpoint")
-                self.diffusion.ema.load_state_dict(checkpoint["ema_state_dict"])
+                self.diffusion.master_model.load_state_dict(checkpoint["ema_state_dict"])
 
     def eval(self):
         self.diffusion.eval()
