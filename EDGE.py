@@ -91,7 +91,7 @@ class EDGE:
             traj_std_path=traj_std_path,
             normalizer=self.normalizer,
         )
-
+        
         smpl = SMPLSkeleton(self.accelerator.device)
         diffusion = GaussianDiffusion(
             model,
@@ -113,9 +113,9 @@ class EDGE:
         )
 
         optim = Adan(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        self.model, self.optim = self.accelerator.prepare(model, optim)
-        self.diffusion = diffusion.to(self.accelerator.device)
-        self.diffusion.model = self.model
+        self.model = model
+        self.optim = optim
+        self.diffusion = diffusion
 
         if checkpoint is not None:
             print("Loading model weights from checkpoint")
@@ -195,8 +195,11 @@ class EDGE:
 
         # set normalizer
         self.normalizer = test_dataset.normalizer
-        self.diffusion.model.normalizer = self.normalizer
+        self.model.normalizer = self.normalizer
         self.diffusion.normalizer = self.normalizer
+        self.diffusion.model.normalizer = self.normalizer
+        self.diffusion.master_model.normalizer = self.normalizer
+        
 
         # data loaders
         # decide number of workers based on cpu count
@@ -218,7 +221,13 @@ class EDGE:
             drop_last=True,
         )
 
-        train_data_loader = self.accelerator.prepare(train_data_loader)
+        # prepare for DDP
+        self.model, self.optim, train_data_loader = self.accelerator.prepare(
+            self.model, self.optim, train_data_loader
+        )
+        self.diffusion = self.diffusion.to(self.accelerator.device)
+        self.diffusion.model = self.model
+        
         # boot up multi-gpu training. test dataloader is only on main process
         load_loop = (
             partial(tqdm, position=1, desc="Batch")
