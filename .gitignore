@@ -46,6 +46,8 @@ training_script_short.sh
 training_script_tr.sh
 training_script_short_ck.sh
 test_script.sh
+EDGE copy.py
+inspect_checkpoint.py
 vis1.py
 test1.py
 interactive_session.sh
