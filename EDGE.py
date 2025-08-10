@@ -47,6 +47,7 @@ class EDGE:
         num_processes = state.num_processes
         self.rank = int(os.environ.get("RANK", 0))
         
+        self.start_epoch = 1
         self.traj_mean_path = traj_mean_path
         self.traj_std_path = traj_std_path
         
@@ -106,6 +107,7 @@ class EDGE:
             cond_drop_prob=0.25,
             guidance_weight=2,
             normalizer=self.normalizer,
+            accelerator=self.accelerator,
         )
 
         print(
@@ -123,7 +125,7 @@ class EDGE:
             if is_training:
                 print("Loading raw model state from checkpoint")
                 weights_to_load = checkpoint["model_state_dict"]
-                self.model.load_state_dict(wrap(weights_to_load))
+                self.model.load_state_dict(maybe_wrap(weights_to_load, num_processes))
             # Otherwise (for inference), we load the EMA weights by default.
             else:
                 print("Loading EMA model state from checkpoint")
@@ -140,7 +142,10 @@ class EDGE:
             if is_training and "ema_state_dict" in checkpoint:
                 print("Loading EMA state from checkpoint")
                 self.diffusion.master_model.load_state_dict(checkpoint["ema_state_dict"])
-
+            
+            if is_training and "epoch" in checkpoint:
+                self.start_epoch = checkpoint["epoch"] + 1
+                
     def eval(self):
         self.diffusion.eval()
 
@@ -237,13 +242,20 @@ class EDGE:
         if self.accelerator.is_main_process:
             save_dir = str(increment_path(Path(opt.project) / opt.exp_name))
             opt.exp_name = save_dir.split("/")[-1]
-            wandb.init(project=opt.wandb_pj_name, name=opt.exp_name, config=config)
+            wandb_id = os.path.split(save_dir)[-1]
+            wandb.init(
+                project=opt.wandb_pj_name,
+                name=opt.exp_name,
+                config=config,
+                id=wandb_id,
+                resume="allow",
+            )
             save_dir = Path(save_dir)
             wdir = save_dir / "weights"
             wdir.mkdir(parents=True, exist_ok=True)
 
         self.accelerator.wait_for_everyone()
-        for epoch in range(1, opt.epochs + 1):
+        for epoch in range(self.start_epoch, opt.epochs + 1):
             
             print(f"\n\n[Rank {self.rank}] Starting Epoch {epoch}", flush=True)
             
@@ -306,6 +318,7 @@ class EDGE:
                         ).state_dict(),
                         "optimizer_state_dict": self.optim.state_dict(),
                         "normalizer": self.normalizer,
+                        "epoch": epoch,
                     }
                     torch.save(ckpt, os.path.join(wdir, f"train-{epoch}.pt"))
                     # generate a sample
