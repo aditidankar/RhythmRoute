@@ -62,6 +62,7 @@ class GaussianDiffusion(nn.Module):
         use_p2=False,         # False
         cond_drop_prob=0.2,   # 0.25
         normalizer=None,
+        accelerator=None,
     ):
         super().__init__()
         self.horizon = horizon
@@ -69,6 +70,7 @@ class GaussianDiffusion(nn.Module):
         self.model = model
         self.ema = EMA(0.9999)
         self.master_model = copy.deepcopy(self.model)
+        self.accelerator = accelerator
 
         self.cond_drop_prob = cond_drop_prob
 
@@ -164,7 +166,12 @@ class GaussianDiffusion(nn.Module):
     
     def model_predictions(self, x, cond, t, weight=None, clip_x_start = False):
         weight = weight if weight is not None else self.guidance_weight
-        model_output = self.model.guided_forward(x, cond, t, weight)
+        model = (
+            self.accelerator.unwrap_model(self.model)
+            if self.accelerator is not None
+            else self.model
+        )
+        model_output = model.guided_forward(x, cond, t, weight)
         maybe_clip = partial(torch.clamp, min = -1., max = 1.) if clip_x_start else identity
         
         x_start = model_output
@@ -193,8 +200,13 @@ class GaussianDiffusion(nn.Module):
         else:
             weight = self.guidance_weight
 
+        model = (
+            self.accelerator.unwrap_model(self.model)
+            if self.accelerator is not None
+            else self.model
+        )
         x_recon = self.predict_start_from_noise(
-            x, t=t, noise=self.model.guided_forward(x, cond, t, weight)
+            x, t=t, noise=model.guided_forward(x, cond, t, weight)
         )
 
         if self.clip_denoised:
