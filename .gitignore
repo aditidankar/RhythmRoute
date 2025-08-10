@@ -42,6 +42,8 @@ dataset/dance_dataset1.py
 training_script.sh
 training_script_ck.sh
 training_script_short.sh
+training_script_short_ck.sh
+training_script_tr.sh
 test_script.sh
 vis1.py
 test1.py
