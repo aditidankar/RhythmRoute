@@ -139,7 +139,7 @@ class EDGE:
             # Load the EMA weights if we are resuming TRAINING.
             if is_training and "ema_state_dict" in checkpoint:
                 print("Loading EMA state from checkpoint")
-                self.diffusion.ema.load_state_dict(checkpoint["ema_state_dict"])
+                self.diffusion.master_model.load_state_dict(checkpoint["ema_state_dict"])
 
     def eval(self):
         self.diffusion.eval()
