@@ -5,6 +5,11 @@ import numpy as np
 from collections import defaultdict
 from tqdm import tqdm
 
+# Get the directory of the current script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Navigate up to the project root directory (assuming the script is in a subdirectory of the root)
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+
 def get_song_name_from_path(path):
     """Extracts the base song name from a slice path."""
     basename = os.path.basename(path.strip('/'))
@@ -80,11 +85,17 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Slice full-length trajectories into 150-frame segments.")
-    parser.add_argument("--full_traj_dir", type=str, default="data/trajectories_full/",
+    
+    # Construct default paths relative to the project root
+    default_full_traj_dir = os.path.join(PROJECT_ROOT, 'data', 'trajectories_full')
+    default_sliced_traj_dir = os.path.join(PROJECT_ROOT, 'data', 'trajectories_sliced')
+    default_feature_dir = os.path.join(PROJECT_ROOT, 'data', 'jukebox_feats_rectified')
+
+    parser.add_argument("--full_traj_dir", type=str, default=default_full_traj_dir,
                         help="Directory containing the full-length .npy trajectory files.")
-    parser.add_argument("--sliced_traj_dir", type=str, default="data/trajectories_sliced/",
+    parser.add_argument("--sliced_traj_dir", type=str, default=default_sliced_traj_dir,
                         help="Directory where the generated trajectory slices will be saved.")
-    parser.add_argument("--feature_dir", type=str, default="data/jukebox_feats_rectified/",
+    parser.add_argument("--feature_dir", type=str, default=default_feature_dir,
                         help="Directory containing the cached .npy feature slices, used to determine slicing.")
     
     args = parser.parse_args()

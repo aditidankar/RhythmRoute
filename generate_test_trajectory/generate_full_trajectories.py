@@ -7,6 +7,11 @@ from collections import defaultdict
 
 import traj_funcs  # Assuming traj_funcs.py is in the same directory
 
+# Get the directory of the current script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Navigate up to the project root directory (assuming the script is in a subdirectory of the root)
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
+
 def get_song_name_from_path(path):
     """Extracts the base song name from a slice path (file or directory).
     e.g., 'data/jukebox_feats_rectified/gWA_sBM_cAll_d26_mWA0_ch02_slice9' -> 'gWA_sBM_cAll_d26_mWA0_ch02'
@@ -45,7 +50,8 @@ def main(args):
 
     print(f"Found {len(slice_paths)} feature slices belonging to {len(songs)} unique songs.")
 
-    available_shapes = ['semicircle', 'line', 'curve', 'curve2', 'circle', 'ellipse']
+    # available_shapes = ['semicircle', 'line', 'curve', 'curve2', 'circle', 'ellipse']
+    available_shapes = ['semicircle', 'line']
 
     for song_name, song_slices in songs.items():
         num_slices = len(song_slices)
@@ -61,8 +67,9 @@ def main(args):
         if shape == 'random':
             current_shape = random.choice(available_shapes)
         
+        traj_funcs_path = os.path.join(SCRIPT_DIR, "traj_funcs.py")
         command = [
-            "python", "traj_funcs.py",
+            "python", traj_funcs_path,
             "--shape", current_shape,
             "--samples", str(total_frames),
             "--out", output_path
@@ -90,12 +97,17 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate one full-length trajectory for each song based on feature slices.")
-    parser.add_argument("--feature_dir", type=str, default="data/jukebox_feats_rectified/", 
+    
+    # Construct default paths relative to the project root
+    default_feature_dir = os.path.join(PROJECT_ROOT, 'data', 'jukebox_feats_rectified')
+    default_traj_dir = os.path.join(PROJECT_ROOT, 'data', 'trajectories_full')
+
+    parser.add_argument("--feature_dir", type=str, default=default_feature_dir, 
                         help="Directory containing the cached .npy feature slices.")
-    parser.add_argument("--traj_dir", type=str, default="data/trajectories_full/", 
+    parser.add_argument("--traj_dir", type=str, default=default_traj_dir, 
                         help="Directory where the generated full-length .npy trajectory files will be saved.")
     parser.add_argument("--shape", type=str, default="random", 
-                        choices=['semicircle', 'line', 'curve', 'curve2', 'circle', 'ellipse', 'spiral', 'random'],
+                        choices=['semicircle', 'line', 'curve', 'curve2', 'circle', 'ellipse', 'random'],
                         help="The shape of the trajectories to generate. 'random' will pick a random shape for each song.")
     
     args = parser.parse_args()
