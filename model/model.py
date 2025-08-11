@@ -418,8 +418,8 @@ class DanceDecoder(nn.Module):
         self.final_layer = nn.Linear(latent_dim, output_feats)
 
     def guided_forward(self, x, cond_embed, times, guidance_weight):
-        unc = self.forward(x, cond_embed, times, cond_drop_prob=1)
-        conditioned = self.forward(x, cond_embed, times, cond_drop_prob=0)
+        unc, _, _ = self.forward(x, cond_embed, times, cond_drop_prob=1)
+        conditioned, _, _ = self.forward(x, cond_embed, times, cond_drop_prob=0)
 
         return unc + (conditioned - unc) * guidance_weight
 
@@ -488,10 +488,10 @@ class DanceDecoder(nn.Module):
         output = self.final_layer(output) # Shape: [B, 150, 151]
         
         # store the ground truth trajectory tokens for loss calculation
-        self.gt_trajectory_tokens = self.trajectory_encoder(cond_embed_trajectory).detach()
+        gt_trajectory_tokens = self.trajectory_encoder(cond_embed_trajectory).detach()
         
         # Extract the trajectory output
-        self.trajectory_output = output[:, :, 4:7]                                # Shape: [B, 150, 3]
-        self.trajectory_output = self.trajectory_encoder(self.trajectory_output)  # Shape: [B, 150, 512]
+        trajectory_output = output[:, :, 4:7]                                # Shape: [B, 150, 3]
+        trajectory_output = self.trajectory_encoder(trajectory_output)  # Shape: [B, 150, 512]
         
-        return output
+        return output, trajectory_output, gt_trajectory_tokens
