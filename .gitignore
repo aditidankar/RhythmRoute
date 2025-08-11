@@ -55,6 +55,7 @@ visualize_path.ipynb
 dataset/preprocess1.py
 dataset/scaler1.py
 media/test_traj_motions.png
+media/test_traj_motions_simple.png
 
 # Media files
 *.gif
