@@ -240,15 +240,22 @@ class EDGE:
             else lambda x: x
         )
         if self.accelerator.is_main_process:
-            save_dir = str(increment_path(Path(opt.project) / opt.exp_name))
-            opt.exp_name = save_dir.split("/")[-1]
-            wandb_id = os.path.split(save_dir)[-1]
+            if opt.checkpoint and os.path.exists(opt.checkpoint):
+                # if we're resuming, we need to save to the same folder
+                save_dir = Path(opt.checkpoint).parent.parent
+                wandb_id = save_dir.name
+                opt.exp_name = wandb_id
+            else:
+                save_dir = str(increment_path(Path(opt.project) / opt.exp_name))
+                opt.exp_name = save_dir.split("/")[-1]
+                wandb_id = os.path.split(save_dir)[-1]
             wandb.init(
                 project=opt.wandb_pj_name,
                 name=opt.exp_name,
                 config=config,
                 id=wandb_id,
                 resume="allow",
+                settings=wandb.Settings(init_timeout=120)
             )
             save_dir = Path(save_dir)
             wdir = save_dir / "weights"
