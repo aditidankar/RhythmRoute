@@ -32,6 +32,7 @@ generate_test_trajectory/old_trajectory_generation_logic
 # Other data/cache folders
 train/
 test/
+filtered_dataset/
 dataset_backups/
 cached_features/
 custom_music
@@ -47,7 +48,6 @@ training_script_tr.sh
 training_script_short_ck.sh
 test_script.sh
 EDGE copy.py
-inspect_checkpoint.py
 vis1.py
 test1.py
 interactive_session.sh
