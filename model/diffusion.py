@@ -20,6 +20,7 @@ from pytorch3d.transforms.rotation_conversions import (
                                 ) # Added: ADITI
 from tqdm import tqdm
 
+from dataset.preprocess import ZNormalizer
 from dataset.quaternion import ax_from_6v, quat_slerp
 from vis import skeleton_render
 
@@ -612,7 +613,30 @@ class GaussianDiffusion(nn.Module):
         else:
             samples = shape
 
+        # unnormalize the predicted motion
         samples = normalizer.unnormalize(samples)
+        
+        # unnormalize the ground truth trajectory
+        gt_trajectory = cond["trajectory"].cpu()
+        
+        model = (
+            self.accelerator.unwrap_model(self.model)
+            if self.accelerator is not None
+            else self.model
+        )
+        
+        # we need to make a znormalizer. we have the paths in the model.
+        # we can use the main normalizer to unnormalize the rest of the sample, but the trajectory needs its own normalizer
+        # we can instantiate one here. the mean and std are stored directly in the trajectory encoder
+        znormalizer = ZNormalizer(
+            data=None, # no need to provide data when not saving
+            mean_path=None, # no need to provide path when not saving
+            std_path=None, # no need to provide path when not saving
+            save=False,
+        )
+        znormalizer.mean = model.trajectory_encoder.mean.to("cpu")
+        znormalizer.std = model.trajectory_encoder.std.to("cpu")
+        gt_trajectory = znormalizer.unnormalize(gt_trajectory)
 
         if samples.shape[2] == 151:
             sample_contact, samples = torch.split(
@@ -701,6 +725,7 @@ class GaussianDiffusion(nn.Module):
                         "smpl_poses": full_q.squeeze(0).reshape((-1, 72)).cpu().numpy(),
                         "smpl_trans": full_pos.squeeze(0).cpu().numpy(),
                         "full_pose": full_pose[0],
+                        "gt_trajectory": gt_trajectory.squeeze(0).cpu().numpy(),
                     },
                     open(os.path.join(fk_out, outname), "wb"),
                 )
@@ -743,6 +768,7 @@ class GaussianDiffusion(nn.Module):
                         "smpl_poses": qq.reshape((-1, 72)).cpu().numpy(),
                         "smpl_trans": pos_.cpu().numpy(),
                         "full_pose": pose,
+                        "gt_trajectory": gt_trajectory[num].cpu().numpy(),
                     },
                     open(f"{fk_out}/{outname}", "wb"),
                 )
