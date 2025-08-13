@@ -611,7 +611,17 @@ class GaussianDiffusion(nn.Module):
         else:
             samples = shape
 
+        gt_trajectory = cond["trajectory"].cpu()
         samples = normalizer.unnormalize(samples)
+
+        # The trajectory is normalized with the rest of the data, so we can unnormalize it here
+        # first, we need to make it the same shape as the rest of the data
+        # the normalizer expects a 151-dim vector
+        padded_gt_trajectory = torch.zeros(gt_trajectory.shape[0], gt_trajectory.shape[1], 151)
+        padded_gt_trajectory[:, :, 4:7] = gt_trajectory
+        unnormalized_padded_gt_trajectory = normalizer.unnormalize(padded_gt_trajectory)
+        gt_trajectory = unnormalized_padded_gt_trajectory[:, :, 4:7]
+
 
         if samples.shape[2] == 151:
             sample_contact, samples = torch.split(
@@ -700,6 +710,7 @@ class GaussianDiffusion(nn.Module):
                         "smpl_poses": full_q.squeeze(0).reshape((-1, 72)).cpu().numpy(),
                         "smpl_trans": full_pos.squeeze(0).cpu().numpy(),
                         "full_pose": full_pose[0],
+                        "gt_trajectory": gt_trajectory.squeeze(0).cpu().numpy(),
                     },
                     open(os.path.join(fk_out, outname), "wb"),
                 )
@@ -742,6 +753,7 @@ class GaussianDiffusion(nn.Module):
                         "smpl_poses": qq.reshape((-1, 72)).cpu().numpy(),
                         "smpl_trans": pos_.cpu().numpy(),
                         "full_pose": pose,
+                        "gt_trajectory": gt_trajectory[num].cpu().numpy(),
                     },
                     open(f"{fk_out}/{outname}", "wb"),
                 )
