@@ -21,6 +21,7 @@ edge_aistpp/
 # This single line ignores the entire /data directory and its contents
 data/train
 data/test
+filtered_dataset/
 data/dataset_backups
 data/dataset_backups_original
 data/jukebox_feats_rectified
