@@ -524,9 +524,9 @@ class DanceDecoder(nn.Module):
         # store the ground truth trajectory tokens for loss calculation
         gt_trajectory_tokens = self.trajectory_encoder(cond_embed_trajectory).detach()
         
-        trajectory_output = output[:, :, 4:7]
-        trajectory_output = self.normalizer.unnormalize(trajectory_output)
-        trajectory_output = self.trajectory_encoder.normalize(trajectory_output)
-        trajectory_output = self.trajectory_encoder(trajectory_output)
+        unnormalized_output = self.normalizer.unnormalize(trajectory_output)
+        trajectory_output  = unnormalized_output[:, :, 4:7]
+        trajectory_output  = self.trajectory_encoder.normalize(trajectory_output)
+        trajectory_output  = self.trajectory_encoder(trajectory_output)
         
         return output, trajectory_output, gt_trajectory_tokens
