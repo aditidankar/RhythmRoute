@@ -56,7 +56,7 @@ def vectorize_many(data):
 
 # # This class is used to normalize trajectories in the dataset.
 class ZNormalizer:
-    def __init__(self, data, mean_path, std_path, save=False):
+    def __init__(self, data, mean_path=None, std_path=None, save=False):
         self.mean_path = mean_path
         self.std_path = std_path
         if save:
@@ -69,13 +69,13 @@ class ZNormalizer:
     def normalize(self, data):
         # Normalize trajectory
         # Load precomputed train std and mean
-        traj_std = torch.load(self.std_path).to(data.device)
-        traj_mean = torch.load(self.mean_path).to(data.device)
+        traj_std = torch.load(self.std_path).to(data.device) if self.std_path else self.std
+        traj_mean = torch.load(self.mean_path).to(data.device) if self.mean_path else self.mean
         return (data - traj_mean) / traj_std
     
     def unnormalize(self, data):
         # Inverse normalize trajectory
         # Load precomputed train std and mean
-        traj_std = torch.load(self.std_path).to(data.device)
-        traj_mean = torch.load(self.mean_path).to(data.device)
+        traj_std = torch.load(self.std_path).to(data.device) if self.std_path else self.std
+        traj_mean = torch.load(self.mean_path).to(data.device) if self.mean_path else self.mean
         return data * traj_std + traj_mean
