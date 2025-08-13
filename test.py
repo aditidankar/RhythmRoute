@@ -16,7 +16,6 @@ from EDGE import EDGE
 from data.audio_extraction.baseline_features import extract as baseline_extract
 from data.audio_extraction.jukebox_features import extract as juke_extract
 import config
-from dataset.preprocess import ZNormalizer
 
 # sort filenames that look like songname_slice{number}.ext
 key_func = lambda x: int(os.path.splitext(x)[0].split("_")[-1].split("slice")[-1])
@@ -43,14 +42,6 @@ def test(opt):
     feature_func = juke_extract if opt.feature_type == "jukebox" else baseline_extract
     sample_length = opt.out_length
     sample_size = int(sample_length / 2.5) - 1
-
-    # Initialize the trajectory normalizer
-    traj_normalizer = ZNormalizer(
-        data=None, # Not needed for loading
-        mean_path=config.TRAJ_MEAN_PATH,
-        std_path=config.TRAJ_STD_PATH,
-        save=False
-    )
 
     temp_dir_list = []
     all_cond = []
@@ -84,8 +75,6 @@ def test(opt):
             trajectory_list = [torch.from_numpy(np.load(f)).float() for f in traj_files]
             trajectory_cond = torch.stack(trajectory_list, dim=0)
 
-            # Normalize the trajectory data
-            trajectory_cond = traj_normalizer.normalize(trajectory_cond)
             
             cond_list = {
                 "music": juke_cond,
@@ -168,10 +157,8 @@ def test(opt):
                 continue
 
             trajectory_cond = torch.stack(trajectory_cond_list, dim=0)
-            
-            # Normalize the trajectory data
-            trajectory_cond = traj_normalizer.normalize(trajectory_cond)
 
+            
             final_cond = {
                 "music": juke_cond,
                 "trajectory": trajectory_cond,
