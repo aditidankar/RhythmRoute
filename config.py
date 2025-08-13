@@ -11,8 +11,17 @@ RENDER_DIR = ROOT_DIR / "renders"
 CHECKPOINTS_DIR = ROOT_DIR / "checkpoints"
 
 # --- Preprocessing ---
-TRAJ_MEAN_PATH = ROOT_DIR / "traj_mean.pt"
-TRAJ_STD_PATH  = ROOT_DIR / "traj_std.pt"
+# Path to the directory where the baseline features will be saved.
+# BASELINE_FEATURES_DIR = "/path/to/your/baseline_features"
+
+# Path to the file containing the mean of the trajectory data.
+TRAJ_MEAN_PATH = "jb_mean.pt"
+
+# Path to the file containing the standard deviation of the trajectory data.
+TRAJ_STD_PATH = "jb_std.pt"
+
+# Path to the file containing the normalizer for the pose data.
+# NORMALIZER_PATH = "/path/to/your/normalizer.pkl"
 
 # --- Model ---
 # FEATURE_TYPE = "jukebox" 
