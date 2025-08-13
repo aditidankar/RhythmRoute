@@ -5,7 +5,7 @@ def parse_train_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", default="runs/train", help="project/name")
     parser.add_argument("--exp_name", default="exp", help="save to project/name")
-    parser.add_argument("--data_path", type=str, default="data/", help="raw data path")
+    parser.add_argument("--data_path", type=str, default="filtered_dataset/", help="raw data path")
     parser.add_argument(
         "--processed_data_dir",
         type=str,
@@ -47,6 +47,7 @@ def parse_test_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument("--feature_type", type=str, default="jukebox")
     parser.add_argument("--out_length", type=float, default=30, help="max. length of output, in seconds")
+    parser.add_argument("--data_path", type=str, default="filtered_dataset/", help="raw data path")
     parser.add_argument(
         "--processed_data_dir",
         type=str,
