@@ -9,7 +9,7 @@ def parse_train_opt():
     parser.add_argument(
         "--processed_data_dir",
         type=str,
-        default="data/dataset_backups/",
+        default="filtered_dataset/dataset_backups/",
         help="Dataset backup path",
     )
     parser.add_argument(
@@ -18,7 +18,7 @@ def parse_train_opt():
 
     parser.add_argument("--feature_type", type=str, default="jukebox")
     parser.add_argument(
-        "--wandb_pj_name", type=str, default="EDGE_Trajectory", help="project name"
+        "--wandb_pj_name", type=str, default="EDGE_Trajectory_jb", help="project name"
     )
     parser.add_argument("--batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--epochs", type=int, default=2000)
@@ -51,7 +51,7 @@ def parse_test_opt():
     parser.add_argument(
         "--processed_data_dir",
         type=str,
-        default="data/dataset_backups/",
+        default="filtered_dataset/dataset_backups/",
         help="Dataset backup path",
     )
     parser.add_argument(
@@ -63,7 +63,7 @@ def parse_test_opt():
     parser.add_argument(
         "--music_dir",
         type=str,
-        default="data/test/wavs",
+        default="filtered_dataset/test/wavs",
         help="folder containing input music",
     )
     parser.add_argument(
@@ -99,7 +99,7 @@ def parse_test_opt():
     parser.add_argument(
         "--trajectory_dir",
         type=str,
-        default="data/trajectories/",
+        default="filtered_dataset/trajectories_sliced/",
         help="folder containing trajectory data",
     )
     opt = parser.parse_args()
