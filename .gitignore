@@ -46,6 +46,7 @@ training_script_short.sh
 training_script_short_ck.sh
 training_script_tr.sh
 training_script_jb.sh
+training_script_jb_zn.sh
 training_script_jb_short.sh
 training_script_zn.sh
 inspect_checkpoint.py
