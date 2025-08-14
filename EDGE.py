@@ -108,6 +108,8 @@ class EDGE:
             guidance_weight=2,
             normalizer=self.normalizer,
             accelerator=self.accelerator,
+            traj_mean_path=traj_mean_path,
+            traj_std_path=traj_std_path,
         )
 
         print(
