@@ -153,12 +153,17 @@ class TrajectoryTransformerEncoder(nn.Module):
             mean = torch.load(traj_mean_path)
             std = torch.load(traj_std_path)
         except FileNotFoundError:
-            raise RuntimeError("Normalization files traj_mean.pt and traj_std.pt not found." 
-                             "Please run the data processing once to generate them.")
-        
+            # if the files are not found, we can't normalize.
+            # however, we can still proceed, as the normalizer will be created on the fly.
+            # we just need to provide dummy values for the buffers.
+            mean = torch.zeros(input_dim)
+            std = torch.ones(input_dim)
+
         # Register as buffers to ensure they are moved to the correct device
         self.register_buffer("mean", mean)
         self.register_buffer("std", std)
+        self.mean_path = traj_mean_path
+        self.std_path = traj_std_path
             
     def forward(self, x):
         # x: [B, 150, 3]
@@ -524,9 +529,9 @@ class DanceDecoder(nn.Module):
         # store the ground truth trajectory tokens for loss calculation
         gt_trajectory_tokens = self.trajectory_encoder(cond_embed_trajectory).detach()
         
-        unnormalized_output = self.normalizer.unnormalize(trajectory_output)
-        trajectory_output  = unnormalized_output[:, :, 4:7]
-        trajectory_output  = self.trajectory_encoder.normalize(trajectory_output)
-        trajectory_output  = self.trajectory_encoder(trajectory_output)
+        unnormalized_output = self.normalizer.unnormalize(output)
+        trajectory_output   = unnormalized_output[:, :, 4:7]
+        trajectory_output   = self.trajectory_encoder.normalize(trajectory_output)
+        trajectory_output   = self.trajectory_encoder(trajectory_output)
         
         return output, trajectory_output, gt_trajectory_tokens
