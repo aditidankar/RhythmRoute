@@ -223,7 +223,7 @@ class EDGE:
             shuffle=True,
             num_workers=2,
             pin_memory=True,
-            drop_last=True,
+            drop_last=False,
         )
 
         # prepare for DDP
