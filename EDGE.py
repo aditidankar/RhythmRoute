@@ -243,7 +243,8 @@ class EDGE:
             if opt.checkpoint and os.path.exists(opt.checkpoint):
                 # if we're resuming, we need to save to the same folder
                 save_dir = Path(opt.checkpoint).parent.parent
-                wandb_id = save_dir.name
+                # get wandb_id from checkpoint, with fallback for old checkpoints
+                wandb_id = self.checkpoint.get("wandb_id", save_dir.name) if self.checkpoint else save_dir.name
                 opt.exp_name = wandb_id
             else:
                 save_dir = str(increment_path(Path(opt.project) / opt.exp_name))
@@ -326,6 +327,7 @@ class EDGE:
                         "optimizer_state_dict": self.optim.state_dict(),
                         "normalizer": self.normalizer,
                         "epoch": epoch,
+                        "wandb_id": wandb_id,
                     }
                     torch.save(ckpt, os.path.join(wdir, f"train-{epoch}.pt"))
                     # generate a sample
