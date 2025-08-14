@@ -62,15 +62,15 @@ class EDGE:
         self.accelerator.wait_for_everyone()
 
         self.normalizer = None
-        checkpoint = None
+        self.checkpoint = None
         if checkpoint_path != "":
             print(f"Loading checkpoint from {checkpoint_path}")
-            checkpoint = torch.load(
+            self.checkpoint = torch.load(
                 checkpoint_path, map_location=self.accelerator.device
             )
             print("Checkpoint loaded successfully")
             print("Loading normalizer from checkpoint")
-            self.normalizer = checkpoint["normalizer"]
+            self.normalizer = self.checkpoint["normalizer"]
 
         model = DanceDecoder(
             nfeats=repr_dim, # number of features in the input sequence 
@@ -114,32 +114,32 @@ class EDGE:
         optim = Adan(self.model.parameters(), lr=learning_rate, weight_decay=weight_decay)
         self.optim = self.accelerator.prepare(optim)
 
-        if checkpoint is not None:
+        if self.checkpoint is not None:
             print("Loading model weights from checkpoint")
             # If we are resuming TRAINING, we MUST load the raw model state.
             if is_training:
                 print("Loading raw model state from checkpoint")
-                weights_to_load = checkpoint["model_state_dict"]
+                weights_to_load = self.checkpoint["model_state_dict"]
                 self.model.load_state_dict(wrap(weights_to_load))
             # Otherwise (for inference), we load the EMA weights by default.
             else:
                 print("Loading EMA model state from checkpoint")
-                weights_to_load = checkpoint["ema_state_dict" if EMA else "model_state_dict"]
+                weights_to_load = self.checkpoint["ema_state_dict" if EMA else "model_state_dict"]
                 self.model.load_state_dict(maybe_wrap(weights_to_load, num_processes))
             print("Model weights loaded successfully")
             
             # Only load the optimizer state if we are resuming TRAINING.
             if is_training:
                 print("Loading optimizer state from checkpoint")
-                self.optim.load_state_dict(checkpoint["optimizer_state_dict"])
+                self.optim.load_state_dict(self.checkpoint["optimizer_state_dict"])
             
             # Load the EMA weights if we are resuming TRAINING.
-            if is_training and "ema_state_dict" in checkpoint:
+            if is_training and "ema_state_dict" in self.checkpoint:
                 print("Loading EMA state from checkpoint")
-                self.diffusion.master_model.load_state_dict(checkpoint["ema_state_dict"])
+                self.diffusion.master_model.load_state_dict(self.checkpoint["ema_state_dict"])
                                         
-            if is_training and "epoch" in checkpoint:
-                self.start_epoch = checkpoint["epoch"] + 1
+            if is_training and "epoch" in self.checkpoint:
+                self.start_epoch = self.checkpoint["epoch"] + 1
 
     def eval(self):
         self.diffusion.eval()
@@ -224,7 +224,8 @@ class EDGE:
             if opt.checkpoint and os.path.exists(opt.checkpoint):
                 # if we're resuming, we need to save to the same folder
                 save_dir = Path(opt.checkpoint).parent.parent
-                wandb_id = save_dir.name
+                # get wandb_id from checkpoint, with fallback for old checkpoints
+                wandb_id = self.checkpoint.get("wandb_id", save_dir.name) if self.checkpoint else save_dir.name
                 opt.exp_name = wandb_id
             else:
                 save_dir = str(increment_path(Path(opt.project) / opt.exp_name))
@@ -307,6 +308,7 @@ class EDGE:
                         "optimizer_state_dict": self.optim.state_dict(),
                         "normalizer": self.normalizer,
                         "epoch": epoch,
+                        "wandb_id": wandb_id,
                     }
                     torch.save(ckpt, os.path.join(wdir, f"train-{epoch}.pt"))
                     # generate a sample
