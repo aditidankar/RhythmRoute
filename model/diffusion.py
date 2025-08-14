@@ -64,6 +64,8 @@ class GaussianDiffusion(nn.Module):
         cond_drop_prob=0.2,   # 0.25
         normalizer=None,
         accelerator=None,
+        traj_mean_path=None,
+        traj_std_path=None,
     ):
         super().__init__()
         self.horizon = horizon
@@ -78,6 +80,8 @@ class GaussianDiffusion(nn.Module):
         # make a SMPL instance for FK module
         self.smpl = smpl
         self.normalizer = normalizer
+        self.traj_mean_path = traj_mean_path
+        self.traj_std_path = traj_std_path
 
         betas = torch.Tensor(
             make_beta_schedule(schedule=schedule, n_timestep=n_timestep)
@@ -629,13 +633,10 @@ class GaussianDiffusion(nn.Module):
         # we can use the main normalizer to unnormalize the rest of the sample, but the trajectory needs its own normalizer
         # we can instantiate one here. the mean and std are stored directly in the trajectory encoder
         znormalizer = ZNormalizer(
-            data=None, # no need to provide data when not saving
-            mean_path=None, # no need to provide path when not saving
-            std_path=None, # no need to provide path when not saving
-            save=False,
+            data=gt_trajectory,
+            mean_path=self.traj_mean_path,
+            std_path=self.traj_std_path,
         )
-        znormalizer.mean = model.trajectory_encoder.mean.to("cpu")
-        znormalizer.std = model.trajectory_encoder.std.to("cpu")
         gt_trajectory = znormalizer.unnormalize(gt_trajectory)
 
         if samples.shape[2] == 151:

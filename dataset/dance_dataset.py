@@ -222,8 +222,8 @@ class AISTPPDataset(Dataset):
 
         print(f"{data_name} Dataset Motion Features Dim: {global_pose_vec_input.shape}")
         
-        # Normalize root trajectory and save std and mean as pt files (run once)
-        traj_normalizer = ZNormalizer(root_pos, self.traj_mean_path, self.traj_std_path, save=self.train)
+        # Normalize root trajectory and save std and mean as pt files
+        traj_normalizer = ZNormalizer(root_pos, self.traj_mean_path, self.traj_std_path)
         normalized_root_pos = traj_normalizer.normalize(root_pos)
         
         return global_pose_vec_input, normalized_root_pos # Added root_pos
