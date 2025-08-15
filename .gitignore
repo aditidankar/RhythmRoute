@@ -47,6 +47,14 @@ training_script_short.sh
 training_script_tr.sh
 training_script_short_ck.sh
 test_script.sh
+test_script_jb.sh
+test_script_jb_trslice.sh
+test_script_jb_zn.sh
+test_script_jb_zn_trslice.sh
+test_script_trslice.sh
+training_script_jb.sh
+training_script_jb_zn.sh
+training_script_zn.sh
 EDGE copy.py
 vis1.py
 test1.py
