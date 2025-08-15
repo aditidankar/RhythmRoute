@@ -350,7 +350,7 @@ class SMPLSkeleton:
         positions_world = []
         rotations_world = []
 
-        expanded_offsets = self._offsets.expand(
+        expanded_offsets = self._offsets.to(rotations.device).expand(
             rotations.shape[0],
             rotations.shape[1],
             self._offsets.shape[0],
