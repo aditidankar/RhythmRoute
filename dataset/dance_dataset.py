@@ -96,7 +96,6 @@ class AISTPPDataset(Dataset):
 
         assert len(self.data["pose"]) == len(self.data["filenames"])
         self.length = len(self.data["pose"])
-        breakpoint()
 
     def __len__(self):
         return self.length
