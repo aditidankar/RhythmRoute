@@ -75,3 +75,12 @@ media/test_traj_motions_simple.png
 *.zip
 *.tar.gz
 *.tar
+
+
+# More files to ignore
+README_old.md
+analyze_trajectory.py
+model_arch.mmd
+test_script_mm.sh
+test_script_zn.sh
+training_script_zn_ck.sh
