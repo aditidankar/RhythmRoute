@@ -62,12 +62,27 @@ def test(opt):
             juke_cond = torch.from_numpy(np.array(juke_list))
             num_slices = len(juke_list)
             
-            traj_filename = os.path.join(opt.trajectory_dir, os.path.basename(slice_dir.strip('/')), os.path.basename(juke_file_list[0]).replace(".npy", ".npy"))
-            # Correctly form the trajectory file path for each slice
-            traj_files = [os.path.join(opt.trajectory_dir, os.path.basename(slice_dir.strip('/')), os.path.basename(f)) for f in juke_file_list]
+            traj_files = []
+            song_name = os.path.basename(slice_dir.strip('/'))
+            all_found = True
+            for f in juke_file_list:
+                slice_basename = os.path.basename(f)
+                
+                # Path for nested structure (e.g., .../trajectories_sliced/song_name/slice.npy)
+                nested_path = os.path.join(opt.trajectory_dir, song_name, slice_basename)
+                # Path for flat structure (e.g., .../trajectories_per_slice/slice.npy)
+                flat_path = os.path.join(opt.trajectory_dir, slice_basename)
 
-            # Check if all trajectory files exist
-            if not all(os.path.exists(f) for f in traj_files):
+                if os.path.exists(nested_path):
+                    traj_files.append(nested_path)
+                elif os.path.exists(flat_path):
+                    traj_files.append(flat_path)
+                else:
+                    print(f"Warning: Trajectory file not found for slice {slice_basename} in both nested and flat structures.")
+                    all_found = False
+                    break 
+            
+            if not all_found:
                 print(f"Warning: Not all trajectory files found for slices in {slice_dir}, skipping...")
                 continue
             
@@ -140,13 +155,21 @@ def test(opt):
             # Load corresponding trajectory slices for the selected audio slices
             trajectory_cond_list = []
             for file in files_to_use:
-                slice_basename = os.path.basename(file)
-                # This assumes the sliced trajectories are in a flat directory for non-cached mode,
-                # or you have a known mapping. Let's assume a flat directory for simplicity here.
-                # e.g. trajectories_sliced/gWA_sBM_cAll_d26_mWA0_ch02_slice9.npy
-                traj_filename = os.path.join(opt.trajectory_dir, slice_basename.replace('.wav', '.npy'))
+                slice_basename = os.path.basename(file).replace('.wav', '.npy')
+                song_name = os.path.splitext(os.path.basename(wav_file))[0]
 
-                if not os.path.exists(traj_filename):
+                # Path for nested structure (e.g., .../trajectories_sliced/song_name/slice.npy)
+                nested_path = os.path.join(opt.trajectory_dir, song_name, slice_basename)
+                # Path for flat structure (e.g., .../trajectories_per_slice/slice.npy)
+                flat_path = os.path.join(opt.trajectory_dir, slice_basename)
+                
+                traj_filename = None
+                if os.path.exists(nested_path):
+                    traj_filename = nested_path
+                elif os.path.exists(flat_path):
+                    traj_filename = flat_path
+
+                if traj_filename is None:
                     print(f"Warning: Trajectory slice file not found for {file}, skipping this slice...")
                     continue
                 
