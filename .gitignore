@@ -19,27 +19,31 @@ edge_aistpp/
 
 # Data and data-related folders
 # This single line ignores the entire /data directory and its contents
+filtered_dataset/
+dataset_backups/
+dataset_traj_backups/
+trajectories_full/
+trajectories_per_slice/
+trajectories_sliced/
+old_trajectories/
 data/train
 data/test
-data/dataset_backups
-data/dataset_traj_backups
-data/dataset_backups_original
-data/jukebox_feats_rectified
-data/trajectories
-data/trajectories_per_slice
-generate_test_trajectory/old_trajectory_generation_logic
+dataset_backups_original
+jukebox_feats_rectified
+trajectories_per_slice_complex/
+trajectories_per_slice_simpler/
+trajectories_per_slice_simplest/
 
 # Other data/cache folders
 train/
 test/
-filtered_dataset/
-dataset_backups/
 cached_features/
 custom_music
 custom_music_one_song/
 
 # Specific file types to ignore
 # =================================
+README_old.md
 dataset/dance_dataset1.py
 training_script.sh
 training_script_ck.sh
@@ -55,6 +59,7 @@ test_script_trslice.sh
 training_script_jb.sh
 training_script_jb_zn.sh
 training_script_zn.sh
+training_script_zn_ck.sh
 EDGE copy.py
 vis1.py
 test1.py
@@ -76,3 +81,12 @@ media/test_traj_motions_simple.png
 *.zip
 *.tar.gz
 *.tar
+
+
+
+# More files
+analyze_trajectory.py
+model_arch.mmd
+test_script_mm.sh
+test_script_zn.sh
+trajectory_analysis.png
