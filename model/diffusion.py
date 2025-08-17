@@ -691,6 +691,12 @@ class GaussianDiffusion(nn.Module):
             full_pose = (
                 self.smpl.forward(full_q, full_pos).detach().cpu().numpy()
             )  # b, s, 24, 3
+
+            # Check if rendering during inference
+            gt_traj_to_render = None
+            if isinstance(epoch, str) and "test" in epoch:
+                gt_traj_to_render = gt_trajectory.squeeze(0).cpu().numpy()
+
             # squeeze the batch dimension away and render
             skeleton_render(
                 full_pose[0],
@@ -700,7 +706,8 @@ class GaussianDiffusion(nn.Module):
                 sound=sound,
                 stitch=True,
                 sound_folder=sound_folder,
-                render=render
+                render=render,
+                gt_trajectory=gt_traj_to_render,
             )
             if fk_out is not None:
                 outname = f'{epoch}_{"_".join(os.path.splitext(os.path.basename(name[0]))[0].split("_")[:-1])}.pkl'
@@ -727,6 +734,12 @@ class GaussianDiffusion(nn.Module):
             num, pose = xx
             filename = name[num] if name is not None else None
             contact = sample_contact[num] if sample_contact is not None else None
+
+            # Check if rendering during inference
+            gt_traj_to_render = None
+            if isinstance(epoch, str) and "test" in epoch:
+                gt_traj_to_render = gt_trajectory[num].cpu().numpy()
+
             skeleton_render(
                 pose,
                 epoch=f"e{epoch}_b{num}",
@@ -734,6 +747,7 @@ class GaussianDiffusion(nn.Module):
                 name=filename,
                 sound=sound,
                 contact=contact,
+                gt_trajectory=gt_traj_to_render,
             )
 
         p_map(inner, enumerate(poses))

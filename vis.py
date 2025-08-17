@@ -180,7 +180,8 @@ def skeleton_render(
     stitch=False,
     sound_folder="ood_sliced",
     contact=None,
-    render=True
+    render=True,
+    gt_trajectory=None,
 ):
     if render:
         # generate the pose with FK
@@ -205,6 +206,17 @@ def skeleton_render(
         # Create a Line3D for the root trajectory
         traj_line, = ax.plot([], [], [], linestyle='-', linewidth=2, color='blue', label='Root Traj')
         root_dot = ax.scatter([], [], [], color='blue', s=50, label='Root Pos')
+
+        if gt_trajectory is not None:
+            ax.plot(
+                gt_trajectory[:, 0],
+                gt_trajectory[:, 1],
+                gt_trajectory[:, 2],
+                linestyle="--",
+                linewidth=2,
+                color="green",
+                label="GT Traj",
+            )
 
         ax.legend(loc='upper right')
         
