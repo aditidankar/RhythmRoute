@@ -29,7 +29,7 @@ def main(args):
     print(f"Found {len(song_dirs)} songs to process.")
 
     # available_shapes = ['semicircle', 't_shape', 'triangle', 'square', 'line', 'curve', 'curve2', 'circle', 'ellipse', 'spiral']
-    available_shapes = ['semicircle', 'line', 'curve', 'curve2', 'circle', 'ellipse']
+    available_shapes = ['semicircle', 'line', 'circle', 'ellipse', 'curve', 'curve2']
 
     for song_dir in song_dirs:
         song_name = os.path.basename(song_dir.strip('/'))
@@ -40,7 +40,7 @@ def main(args):
             current_shape = random.choice(available_shapes)
         
         command = [
-            "python", "traj_funcs.py",
+            "python", "../traj_funcs.py",
             "--shape", current_shape,
             "--samples", "150",
             "--out", output_path
@@ -68,9 +68,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate trajectories for all test set songs.")
-    parser.add_argument("--feature_dir", type=str, default="data/jukebox_feats_rectified/", 
+    parser.add_argument("--feature_dir", type=str, default="../../filtered_dataset/jukebox_feats_rectified/", 
                         help="Directory containing the cached features, with one subdirectory per song.")
-    parser.add_argument("--traj_dir", type=str, default="data/trajectories/", 
+    parser.add_argument("--traj_dir", type=str, default="../../filtered_dataset/trajectories_per_slice_complex/", 
                         help="Directory where the generated .npy trajectory files will be saved.")
     parser.add_argument("--shape", type=str, default="random", 
                         choices=['semicircle', 't_shape', 'triangle', 'square', 'line', 'curve', 'curve2', 'circle', 'ellipse', 'spiral', 'random'],
