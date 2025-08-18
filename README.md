@@ -1,7 +1,4 @@
 ## RhythmRoute: Trajectory-Conditioned Dance Generation from Music
-**An extension of EDGE: Editable Dance Generation From Music (CVPR 2023)**<br>
-Original Authors: Jonathan Tseng, Rodrigo Castellon, C. Karen Liu<br>
-https://arxiv.org/abs/2211.10658
 
 ### Abstract
 RhythmRoute is a method for trajectory-conditioned dance generation from music. It builds upon **EDGE: Editable Dance Generation From Music** (CVPR 2023), a state-of-the-art music-to-dance model. RhythmRoute enhances EDGE by allowing users to specify a 3D trajectory for the dancer to follow, providing fine-grained control over the generated motion's spatial path. This is achieved by conditioning a transformer-based diffusion model on both powerful music features from Jukebox and the desired 3D trajectory data. The model can create realistic, physically-plausible dances that are synchronized with the music while adhering to the user-defined path, enabling new creative possibilities for choreographers and artists.
@@ -122,8 +119,12 @@ to convert motions into FBX files, which can be imported into Blender and retarg
 ## Development
 This project is currently under active development.
 
-<!-- ## Citation
-This project is built upon the original EDGE implementation. If you use this work, please consider citing the original paper:
+
+## Note:
+**This project is built upon the original EDGE: Editable Dance Generation From Music (CVPR 2023) implementation.**<br>
+Original Authors: Jonathan Tseng, Rodrigo Castellon, C. Karen Liu<br>
+https://arxiv.org/abs/2211.10658
+
 ```
 @article{tseng2022edge,
   title={EDGE: Editable Dance Generation From Music},
@@ -132,7 +133,8 @@ This project is built upon the original EDGE implementation. If you use this wor
   year={2022}
 }
 ```
+
+<!-- ## Citation
+
 ## Acknowledgements
 We would like to thank [lucidrains](https://github.com/lucidrains) for the [Adan](https://github.com/lucidrains/Adan-pytorch) and [diffusion](https://github.com/lucidrains/denoising-diffusion-pytorch) repos, [softcat477](https://github.com/softcat477) for their [SMPL to FBX](https://github.com/softcat477/SMPL-to-FBX) library, and [BobbyAnguelov](https://github.com/BobbyAnguelov) for their [FBX Converter tool](https://github.com/BobbyAnguelov/FbxFormatConverter). -->
-
-
