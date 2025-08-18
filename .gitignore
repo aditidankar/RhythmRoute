@@ -84,3 +84,7 @@ model_arch.mmd
 test_script_mm.sh
 test_script_zn.sh
 training_script_zn_ck.sh
+test_script_jb_mm.sh
+test_script_jb_mm_1500.sh
+test_script_jb_zn_ct.sh
+test_script_jb_zn_ct_1500.sh
