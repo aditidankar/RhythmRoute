@@ -15,7 +15,7 @@ The example build this repo was validated on:
 *   Python: `3.8.12`
 *   PyTorch: `1.13.1` (with `torchvision==0.14.1`, `torchaudio==0.13.1`)
 *   GPU: 1 x NVIDIA A100-PCIE-40GB
-*   *Note: Detailed CPU, System RAM, and driver versions can be added here.*
+<!-- *   Note: Detailed CPU, System RAM, and driver versions can be added here.* -->
 
 This repository additionally depends on the following libraries, which may require special installation procedures:
 * [jukemirlib](https://github.com/rodrigo-castellon/jukemirlib)
@@ -121,7 +121,7 @@ This project is currently under active development.
 
 
 ## Note:
-**This project is built upon the original EDGE: Editable Dance Generation From Music (CVPR 2023) implementation.**<br>
+**This project is built upon EDGE: Editable Dance Generation From Music (CVPR 2023).**<br>
 Original Authors: Jonathan Tseng, Rodrigo Castellon, C. Karen Liu<br>
 https://arxiv.org/abs/2211.10658
 
