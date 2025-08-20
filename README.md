@@ -27,7 +27,7 @@ This repository additionally depends on the following libraries, which may requi
 ### Installation
 Clone the repository and install the required packages:
 ```.bash
-git clone <your-repo-url>
+git clone [https://github.com/aditidankar/RhythmRoute.git]
 cd RhythmRoute
 pip install -r requirements.txt
 ```
