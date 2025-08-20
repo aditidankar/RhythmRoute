@@ -71,7 +71,7 @@ The generated dances will be saved in the `renders/` directory by default.
 
 ### (Optional, retraining only) Dataset Download
 This project uses the AIST++ dataset. You can download the raw data (motion and audio) from the official website:
-**[AIST Dance Video Database](https://aistdancedb.ongaaccel.jp/database_download/)** (Requires user registration)
+**[AIST Dance Video Database](https://aistdancedb.ongaaccel.jp/database_download/)** 
 
 After downloading, you will need to process the data to prepare it for training. This involves creating motion and audio slices and extracting music features:
 ```.bash
